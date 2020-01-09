@@ -252,8 +252,7 @@ class CondaGraph(DiGraph):
         """
         Returns the first-level dependecies of the package.
         """
-        n = self.get_node_by_name(pkg_name)
-        return list(self._outward.get(n))
+        return self._outward.get(self._norm(pkg_name))
 
     def get_package_dependency_tree(self, pkg_name, max_depth=15):
         """
@@ -262,14 +261,14 @@ class CondaGraph(DiGraph):
         if pkg_name not in self:
             return {}
         
-        node = self.get_node_by_name(pkg_name)
+        node = self._norm(pkg_name)
         out = defaultdict(set)
         out[0].append(node)
         dep_lvls = {}
             
         for depth in range(max_depth):
             for node in out.get(depth):
-                deps = set(self.get_package_dependencies(node))
+                deps = self.get_package_dependencies(node)
                 out[depth + 1].update(deps)
                 # move all dependencies to lowest required level
                 for dep in deps:
