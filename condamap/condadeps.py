@@ -204,11 +204,11 @@ class CondaEnvironment:
         for pkg in self.env_packages_info.values():
             g.add_connections(pkg.get('simple_name'), pkg.get('depends'))
 
-    def minified_requirements(self, 
-                              include=None, 
-                              exclude=None, 
-                              add_versions='full',
-                              add_builds=False):
+    def minify_requirements(self, 
+                            include=None, 
+                            exclude=None, 
+                            add_versions='full',
+                            add_builds=False):
         """
         Builds a minified version of the requirements YAML.
 
@@ -236,10 +236,10 @@ class CondaEnvironment:
         add_builds : bool
         """
         # convert strings to lists, None to empty
-        if add_versions not in ('full', 'major', 'minor', True, False):
+        if add_versions not in ('full', 'major', 'minor', 'none', True, False):
             raise ValueError(
                 "Argument `add_version` accepts the following values:"
-                "('full', 'major', 'minor', True, False)."
+                "('full', 'major', 'minor', 'none', True, False)."
             )
         how = add_versions
         if isinstance(include, str):
@@ -296,10 +296,11 @@ class CondaEnvironment:
             conda_dep_str.format(name=name, **pkg)
             for name, pkg in conda_deps.items()
         ]
-        all_deps += {'pip': [
-            pip_dep_str.format(name=name, **pkg)
-            for name, pkg in pip_deps.items()
-        ]}
+        if pip_deps:
+            all_deps += [{'pip': [
+                pip_dep_str.format(name=name, **pkg)
+                for name, pkg in pip_deps.items()
+            ]}]
 
         env_data = {
             'name': self.name,
