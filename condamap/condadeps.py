@@ -1,6 +1,7 @@
 import pathlib
 import sys
 import json
+import yaml
 from collections import defaultdict
 from conda.cli.python_api import run_command as run_conda
 from conda.exceptions import EnvironmentLocationNotFound
@@ -26,7 +27,7 @@ class CondaEnvironment:
         self._name = None
         self._path = None
         self._env_packages_raw = []
-        self._env_packages_info = []
+        self._env_packages_info = {}
         self._env_packages_name_map = {}
         self._pkgs_dirs = self.get_conda_pkgs_dirs()
         self.conda_graph = CondaGraph()
@@ -235,6 +236,12 @@ class CondaEnvironment:
         add_builds : bool
         """
         # convert strings to lists, None to empty
+        if add_versions not in ('full', 'major', 'minor', True, False):
+            raise ValueError(
+                "Argument `add_version` accepts the following values:"
+                "('full', 'major', 'minor', True, False)."
+            )
+        how = add_versions
         if isinstance(include, str):
             include = [include]
         if isinstance(exclude, str):
@@ -246,11 +253,61 @@ class CondaEnvironment:
         include = set(c for c in map(self._conda_name, include) if c)
         exclude = set(c for c in map(self._conda_name, exclude) if c)
 
-        reqs_include = set(map(self._conda_name, 
+        req_names = set(map(self._conda_name, 
             self.conda_graph.get_highest_dependents()))
-        reqs_include = reqs_include.union(include).difference(exclude)
+        req_names = req_names.union(include).difference(exclude)
+        req_data = {k: self._env_packages_info[k] for k in req_names}
 
-        reqs_data = {ri: None}
+        conda_deps = {
+            name: {
+                'version': self._format_version(pkg.get('version'), how),
+                'build_string': pkg.get('build_string'),
+                'channel': pkg.get('channel')
+            }
+            for name, pkg in req_data.items()
+            if pkg.get('channel') != 'pypi'
+        }
+
+        # set default channels first i guess?
+        channels = set(d.get('channel') for d in conda_deps.values())
+        channels = sorted(channels, key=lambda x: 'pkgs/' not in x)
+        
+        pip_deps = {
+            name: {
+                'version': self._format_version(pkg.get('version'), how),
+                'build_string': pkg.get('build_string'),
+                'channel': pkg.get('channel')
+            }
+            for name, pkg in req_data.items()
+            if pkg.get('channel') == 'pypi'
+        }
+
+        conda_dep_str = '{name}'
+        pip_dep_str = '{name}'
+        if add_versions:
+            conda_dep_str += '={version}'
+            pip_dep_str += '=={version}'
+        if add_builds:
+            if not add_versions:
+                conda_dep_str += '=*'
+            conda_dep_str += '={build_string}'
+
+        all_deps = [
+            conda_dep_str.format(name=name, **pkg)
+            for name, pkg in conda_deps.items()
+        ]
+        all_deps += {'pip': [
+            pip_dep_str.format(name=name, **pkg)
+            for name, pkg in pip_deps.items()
+        ]}
+
+        env_data = {
+            'name': self.name,
+            'channels': channels,
+            'dependencies': all_deps
+        }
+
+        return yaml.dump(env_data, sort_keys=False)
 
     @property
     def name(self):
@@ -300,6 +357,26 @@ class CondaEnvironment:
     def _norm(pkg_name):
         """Normalized a package name"""
         return str(pkg_name).lower().replace('-', '_').replace('.', '_')
+
+    @staticmethod
+    def _format_version(version, how):
+        n = version.count('.')
+        if (n == 0) or (how=='full') or (how is True):
+            return version
+        if n == 1:
+            major, minor = version.split('.')
+            subs = ''
+        if version.count('.') >= 2:
+            major, minor, subs = version.split('.', 2)
+
+        if how == 'major':
+            return major + '.*'
+        if how == 'minor':
+            if not subs:
+                return '{0}.{1}'.format(major, minor)
+            return '{0}.{1}.*'.format(major, minor)
+
+    #TODO: add default channel extraction
 
     @staticmethod
     def get_conda_pkgs_dirs():
