@@ -14,6 +14,7 @@ class CondaEnvironment:
         self._env_packages_raw = []
         self._env_packages_info = []
         self._pkgs_dirs = self.get_conda_pkgs_dirs()
+        self.graph = CondaGraph()
         if not name and not path:
             raise ValueError('Either the `name` or `path` of the Conda '
                 'environment is required.')
@@ -162,12 +163,13 @@ class CondaEnvironment:
             reqs_dict.setdefault(self.normalize_name(k), ''.join(v))
         return reqs_dict
 
-    def build_dependency_map(self):
-        pass
-
-    @staticmethod
-    def normalize_name(pkg_name):
-        return pkg_name.lower().replace('-', '_').replace('.', '_')
+    def build_graph(self):
+        """
+        Builds the CondaGraph of package dependencies.
+        """
+        g = self.graph = CondaGraph()
+        for pkg in self.env_packages_info:
+            g.add_connections(pkg.get('simple_name'), pkg.get('depends'))
 
     @property
     def name(self):
@@ -212,6 +214,10 @@ class CondaEnvironment:
             else s1.format(**p)
             for p in self._env_packages_info
         ])
+
+    @staticmethod
+    def normalize_name(pkg_name):
+        return pkg_name.lower().replace('-', '_').replace('.', '_')
 
     @staticmethod
     def get_conda_pkgs_dirs():
