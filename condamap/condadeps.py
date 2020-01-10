@@ -27,8 +27,10 @@ class CondaEnvironment:
         self._path = None
         self._env_packages_raw = []
         self._env_packages_info = []
+        self._env_packages_name_map = {}
         self._pkgs_dirs = self.get_conda_pkgs_dirs()
         self.graph = CondaGraph()
+
         if not name and not path:
             raise ValueError('Either the `name` or `path` of the Conda '
                 'environment is required.')
@@ -56,6 +58,9 @@ class CondaEnvironment:
         self._name = path.stem
         self._path = path
 
+    def __contains__(self, item):
+        return item in self._env_packages_name_map
+
     def load_conda_json(self):
         """
         Uses Conda to read the environment specs in json format.  Run if a
@@ -75,20 +80,21 @@ class CondaEnvironment:
 
         Note: this will fail entirely if `conda clean` has been run.
         """
-        env_packages_info = []
         for pkg in self._env_packages_raw:
+            name = pkg.get('name')
+            simple = self._norm(name)
+            self._env_packages_name_map.setdefault(name, name)
+            self._env_packages_name_map.setdefault(simple, name)
+
             if pkg.get('channel') != 'pypi':
                 p_info = self.read_conda_metadata(pkg)
             else:
                 p_info = self.read_pypi_metadata_reqs(pkg)
-            p_info['depends'] = self._clean_requirments(
-                p_info.get('depends', [])
-            )
-            p_info['simple_name'] = self.normalize_name(
-                p_info.get('name')
-            )
-            env_packages_info.append(p_info)
-        self._env_packages_info = env_packages_info
+
+            deps =  self._clean_requirments(p_info.get('depends', []))
+            p_info['depends'] = deps
+            p_info['simple_name'] = simple
+            self._env_packages_info.append(p_info)
 
     def read_conda_metadata(self, pkg):
         """
@@ -174,8 +180,16 @@ class CondaEnvironment:
         reqs_dict = {}
         for req in reqs:
             k, *v = req.split(' ', 1)
-            reqs_dict.setdefault(self.normalize_name(k), ''.join(v))
+            reqs_dict.setdefault(self._norm(k), ''.join(v))
         return reqs_dict
+
+    def get_package(self, pkg_name):
+        """
+        Finds and returns the package information with `pkg_name`.
+        """
+        simple = self._norm(pkg_name)
+        name = self._env_packages_name_map.get(simple, pkg_name)
+        return self.env_packages_info.get(name, {})
 
     def build_graph(self):
         """
@@ -184,6 +198,38 @@ class CondaEnvironment:
         g = self.graph = CondaGraph()
         for pkg in self.env_packages_info.values():
             g.add_connections(pkg.get('simple_name'), pkg.get('depends'))
+
+    def minified_requirements(self, 
+                              include=None, 
+                              exclude=None, 
+                              add_versions='full',
+                              add_builds=True):
+        """
+        Builds a minified version of the requirements YAML.
+
+        ::Parameters::
+        include : The packages to include in the requirements.  Defaults to
+            including only the packages with top-level dependency.  Adding
+            a dependency (lower level) package allows pinning the version,
+            build, and channel.
+        exclude : Packages to exclude from the requirments.  Only removes 
+            top-level dependency packages.  Useful for exporting computation
+            without visualization.  I.e. ``exclude=['matplotlib']``.
+        add_versions : Add part of or the full version to the requirements. 
+            Allowed values are: 
+            'full' or True - Include the exact version
+            'major' - Include the major value of the version only ('1.*')
+            'minor' - Include the major and minor versions ('1.11.*')
+            'none' or False - Version not added.
+        add_builds : Add the build number to the requirment.
+
+        ::Types::
+        include : list-like
+        exclude : list-like
+        add_version : str|bool
+        add_builds : bool
+        """
+
 
     @property
     def name(self):
@@ -230,8 +276,9 @@ class CondaEnvironment:
         ])
 
     @staticmethod
-    def normalize_name(pkg_name):
-        return pkg_name.lower().replace('-', '_').replace('.', '_')
+    def _norm(pkg_name):
+        """Normalized a package name"""
+        return str(pkg_name).lower().replace('-', '_').replace('.', '_')
 
     @staticmethod
     def get_conda_pkgs_dirs():
@@ -288,9 +335,10 @@ class CondaGraph(DiGraph):
         dep_lvls = {}
             
         for depth in range(max_depth):
-            for node in out.get(depth):
+            for node in out.get(depth, set()).copy():
                 deps = self.get_package_dependencies(node)
-                out[depth + 1].update(deps)
+                if deps:
+                    out[depth + 1].update(deps)
                 # move all dependencies to lowest required level
                 for dep in deps:
                     if dep in dep_lvls:
@@ -298,4 +346,6 @@ class CondaGraph(DiGraph):
                         out[lvl].discard(dep)
                 # update latest level
                 dep_lvls.update({dep: depth+1 for dep in deps})
-        return out
+        return dict(out)
+
+    
