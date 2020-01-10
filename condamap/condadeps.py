@@ -29,7 +29,7 @@ class CondaEnvironment:
         self._env_packages_info = []
         self._env_packages_name_map = {}
         self._pkgs_dirs = self.get_conda_pkgs_dirs()
-        self.graph = CondaGraph()
+        self.conda_graph = CondaGraph()
 
         if not name and not path:
             raise ValueError('Either the `name` or `path` of the Conda '
@@ -94,7 +94,7 @@ class CondaEnvironment:
             deps =  self._clean_requirments(p_info.get('depends', []))
             p_info['depends'] = deps
             p_info['simple_name'] = simple
-            self._env_packages_info.append(p_info)
+            self._env_packages_info[name] = p_info
 
     def read_conda_metadata(self, pkg):
         """
@@ -183,19 +183,23 @@ class CondaEnvironment:
             reqs_dict.setdefault(self._norm(k), ''.join(v))
         return reqs_dict
 
+    def _conda_name(self, pkg_name):
+        """Attempt to find the name Conda uses for `pkg_name`"""
+        simple = self._norm(pkg_name)
+        name = self._env_packages_name_map.get(simple, '')
+        return name
+
     def get_package(self, pkg_name):
         """
         Finds and returns the package information with `pkg_name`.
         """
-        simple = self._norm(pkg_name)
-        name = self._env_packages_name_map.get(simple, pkg_name)
-        return self.env_packages_info.get(name, {})
+        return self.env_packages_info.get(self._conda_name(pkg_name), {})
 
     def build_graph(self):
         """
         Builds the CondaGraph of package dependencies.
         """
-        g = self.graph = CondaGraph()
+        g = self.conda_graph = CondaGraph()
         for pkg in self.env_packages_info.values():
             g.add_connections(pkg.get('simple_name'), pkg.get('depends'))
 
@@ -203,7 +207,7 @@ class CondaEnvironment:
                               include=None, 
                               exclude=None, 
                               add_versions='full',
-                              add_builds=True):
+                              add_builds=False):
         """
         Builds a minified version of the requirements YAML.
 
@@ -221,7 +225,8 @@ class CondaEnvironment:
             'major' - Include the major value of the version only ('1.*')
             'minor' - Include the major and minor versions ('1.11.*')
             'none' or False - Version not added.
-        add_builds : Add the build number to the requirment.
+        add_builds : Add the build number to the requirment, highly specific
+            and will override loosening of version requirements.
 
         ::Types::
         include : list-like
@@ -229,7 +234,23 @@ class CondaEnvironment:
         add_version : str|bool
         add_builds : bool
         """
+        # convert strings to lists, None to empty
+        if isinstance(include, str):
+            include = [include]
+        if isinstance(exclude, str):
+            exclude = [exclude]
+        if not include:
+            include = []
+        if not exclude:
+            exclude = []
+        include = set(c for c in map(self._conda_name, include) if c)
+        exclude = set(c for c in map(self._conda_name, exclude) if c)
 
+        reqs_include = set(map(self._conda_name, 
+            self.conda_graph.get_highest_dependents()))
+        reqs_include = reqs_include.union(include).difference(exclude)
+
+        reqs_data = {ri: None}
 
     @property
     def name(self):
@@ -245,7 +266,7 @@ class CondaEnvironment:
 
     @property
     def env_packages(self):
-        return tuple([p.get('name') for p in self._env_packages_info])
+        return tuple(self._env_packages_info)
 
     @property
     def env_packages_info(self):
@@ -260,8 +281,8 @@ class CondaEnvironment:
             'version'
         )
         return {
-            pkg.get('name'): {k: pkg.get(k, '') for k in info_keys}
-            for pkg in self._env_packages_info
+            name: {k: pkg.get(k, '') for k in info_keys}
+            for name, pkg in self._env_packages_info.items()
         }
 
     @property
@@ -272,7 +293,7 @@ class CondaEnvironment:
             s2.format(**p) 
             if p.get('build_string').startswith('pypi')
             else s1.format(**p)
-            for p in self._env_packages_info
+            for p in self._env_packages_info.values()
         ])
 
     @staticmethod
