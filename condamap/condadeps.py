@@ -9,6 +9,20 @@ from .graph import DiGraph
 
 class CondaEnvironment:
     def __init__(self, name=None, path=None):
+        """
+        Read in the packages and dependencies for the Conda environment `name`
+        or located at `path`.
+
+        ::Paramters::
+        name : the name of the Conda environment.
+        path : the path to the Conda environment, use if the environment is 
+            located in a directory known by Conda.  If `name` is passed,
+            `path` is ignored.
+
+        ::Types::
+        name : str
+        path : str
+        """
         self._name = None
         self._path = None
         self._env_packages_raw = []
@@ -168,7 +182,7 @@ class CondaEnvironment:
         Builds the CondaGraph of package dependencies.
         """
         g = self.graph = CondaGraph()
-        for pkg in self.env_packages_info:
+        for pkg in self.env_packages_info.values():
             g.add_connections(pkg.get('simple_name'), pkg.get('depends'))
 
     @property
@@ -238,6 +252,7 @@ class CondaEnvironment:
         ).absolute()
         return path
 
+
 class CondaGraph(DiGraph):
 
     def get_lowest_dependencies(self):
@@ -245,14 +260,14 @@ class CondaGraph(DiGraph):
         Returns a list of the packages which do not depend on any other 
         package in the environment.  These are the roots of the graph.
         """
-        return [k for k in self._outward if not self._inward.get(k)]
+        return [k for k in self._inward if not self._outward.get(k)]
 
     def get_highest_dependents(self):
         """
         Returns a list of packages which are not a dependency for another
         package in the environment.  These are the leaves of the graph.
         """
-        return [k for k in self._inward if not self._outward.get(k)]
+        return [k for k in self._outward if not self._inward.get(k)]
 
     def get_package_dependencies(self, pkg_name):
         """
@@ -269,7 +284,7 @@ class CondaGraph(DiGraph):
         
         node = self._norm(pkg_name)
         out = defaultdict(set)
-        out[0].append(node)
+        out[0].add(node)
         dep_lvls = {}
             
         for depth in range(max_depth):
