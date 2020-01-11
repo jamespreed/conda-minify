@@ -3,30 +3,34 @@ import sys
 import json
 import yaml
 from collections import defaultdict
-from conda.cli.python_api import run_command as run_conda
+from conda.cli.python_api import run_command
 from conda.exceptions import EnvironmentLocationNotFound
 from .graph import DiGraph
 
 
 class CondaEnvironment:
-    def __init__(self, name=None, path=None):
+    """
+    Imports a Conda environment specs and generates a minified version of
+    the environment requirements.  This facilitates sharing environments 
+    cross-platform when only the highest-level pacakges are really
+    required.
+    """
+
+    def __init__(self, name=None, path=None, *, conda_env_root=None):
         """
         Read in the packages and dependencies for the Conda environment `name`
         or located at `path`.
 
-        ::Paramters::
-        name : the name of the Conda environment.
-        path : the path to the Conda environment, use if the environment is 
-            located in a directory known by Conda.  If `name` is passed,
-            `path` is ignored.
+        :param name: the name of the Conda environment.
+        :param path: the path to the Conda environment, use if the environment 
+            is located in a directory not known by Conda.  If `name` is 
+            passed, `path` is ignored.
 
-        ::Types::
-        name : str
-        path : str
+        :type name: str
+        :type path: str
         """
         self._name = None
         self._path = None
-        self._env_packages_raw = []
         self._env_packages_info = {}
         self._env_packages_name_map = {}
         self._pkgs_dirs = self.get_conda_pkgs_dirs()
@@ -39,12 +43,11 @@ class CondaEnvironment:
             self._init_from_name(name)
         elif path:
             self._init_from_path(path)
-        self.load_conda_json()
         self.load_package_metadata()
             
     def _init_from_name(self, name):
         try:
-            header, _, _ = run_conda('list', '-n', name, '_NOPACKAGE_')
+            header, _, _ = run_command('list', '-n', name, '_NOPACKAGE_')
         except EnvironmentLocationNotFound:
             raise
         self._name = name
@@ -52,7 +55,7 @@ class CondaEnvironment:
 
     def _init_from_path(self, path):
         try:
-            header, _, _ = run_conda('list', '-p', path, '_NOPACKAGE_')
+            header, _, _ = run_command('list', '-p', path, '_NOPACKAGE_')
         except EnvironmentLocationNotFound:
             raise
         path = self._parse_list_header(header)
@@ -62,14 +65,16 @@ class CondaEnvironment:
     def __contains__(self, item):
         return item in self._env_packages_name_map
 
-    def load_conda_json(self):
+    def get_conda_env_json(self):
         """
         Uses Conda to read the environment specs in json format.  Run if a
         change to the environment has been made after this object was 
         initialized.
+
+        :returns: list[dict]
         """
-        pkgs_str, _, _ = run_conda('list', '-p', self.path, '--json')
-        self._env_packages_raw = json.loads(pkgs_str)
+        pkgs_str, _, _ = run_command('list', '-p', self.path, '--json')
+        return json.loads(pkgs_str)
 
     def load_package_metadata(self):
         """
@@ -81,7 +86,7 @@ class CondaEnvironment:
 
         Note: this will fail entirely if `conda clean` has been run.
         """
-        for pkg in self._env_packages_raw:
+        for pkg in self.get_conda_env_json():
             name = pkg.get('name')
             simple = self._norm(name)
             self._env_packages_name_map.setdefault(name, name)
@@ -90,7 +95,7 @@ class CondaEnvironment:
             if pkg.get('channel') != 'pypi':
                 p_info = self.read_conda_metadata(pkg)
             else:
-                p_info = self.read_pypi_metadata_reqs(pkg)
+                p_info = self.read_pypi_metadata(pkg)
 
             deps =  self._clean_requirments(p_info.get('depends', []))
             p_info['depends'] = deps
@@ -101,6 +106,11 @@ class CondaEnvironment:
         """
         Search for the package's index.json file in the Conda `pkgs_dirs`
         locations.  Returns a copy of `pkg` with the updated metadata. 
+
+        :param pkg: the package metadata, must include `dist_name`
+        :type pkg: dict
+
+        :returns: dict
         """
         paths = [
             d.joinpath(pkg['dist_name'], 'info', 'index.json')
@@ -122,6 +132,10 @@ class CondaEnvironment:
         """
         This modifies the `pkg` in-place if the name has a dash.
         Returns the path to the PyPi metadata file or None.
+
+        :param pkg: the package metadata, must include `name` and `version`
+        :type pkg: dict
+        :returns: pathlib.Path or None
         """
         pkg_name = pkg.get('name')
         pkg_version = pkg.get('version')
@@ -139,10 +153,15 @@ class CondaEnvironment:
                 return path
         return None
 
-    def read_pypi_metadata_reqs(self, pkg):
+    def read_pypi_metadata(self, pkg):
         """
         Search for a PyPi package's METADATA file in the Lib/site-packages
         directory of the environment.
+
+        :param pkg: the package metadata, must include `name` and `version`
+        :type pkg: dict
+
+        :returns: dict
         """
         out = pkg.copy()
         path = self.get_pypi_pkg_path(out)
@@ -176,6 +195,7 @@ class CondaEnvironment:
         return out
 
     def _clean_requirments(self, reqs):
+        """Clean up the requirements dicts"""
         if isinstance(reqs, dict):
             return reqs
         reqs_dict = {}
@@ -193,6 +213,9 @@ class CondaEnvironment:
     def get_package(self, pkg_name):
         """
         Finds and returns the package information with `pkg_name`.
+
+        :param pkg_name: the name of the package
+        :type pkg_name: str
         """
         return self.env_packages_info.get(self._conda_name(pkg_name), {})
 
@@ -212,34 +235,36 @@ class CondaEnvironment:
         """
         Builds a minified version of the requirements YAML.
 
-        ::Parameters::
-        include : The packages to include in the requirements.  Defaults to
-            including only the packages with top-level dependency.  Adding
+        :param include: The packages to include in the requirements.  Defaults 
+            to including only the packages with top-level dependency.  Adding
             a dependency (lower level) package allows pinning the version,
             build, and channel.
-        exclude : Packages to exclude from the requirments.  Only removes 
+        :param exclude: Packages to exclude from the requirments. Only removes 
             top-level dependency packages.  Useful for exporting computation
             without visualization.  I.e. ``exclude=['matplotlib']``.
-        add_versions : Add part of or the full version to the requirements. 
-            Allowed values are: 
-            'full' or True - Include the exact version
-            'major' - Include the major value of the version only ('1.*')
-            'minor' - Include the major and minor versions ('1.11.*')
-            'none' or False - Version not added.
-        add_builds : Add the build number to the requirment, highly specific
-            and will override loosening of version requirements.
+        :param add_versions: Add part of or the full version to the 
+            requirements. Allowed values are: 
+              'full' or 'true' or True- Include the exact version
+              'major' - Include the major value of the version only ('1.*')
+              'minor' - Include the major and minor versions ('1.11.*')
+              'none' or 'false' or False - Version not added.
+        :param add_builds: Add the build number to the requirment, highly 
+            specific and will override loosening of version requirements.
 
-        ::Types::
-        include : list-like
-        exclude : list-like
-        add_version : str|bool
-        add_builds : bool
+        :returns: yaml string
+
+        :type include: list-like
+        :type exclude: list-like
+        :type add_version: str|bool
+        :type add_builds: bool
         """
         # convert strings to lists, None to empty
-        if add_versions not in ('full', 'major', 'minor', 'none', True, False):
+        allowed = ('full', 'major', 'minor', 'none', 'true', 'false')
+        add_versions = str(add_versions).lower()
+        if add_versions not in allowed:
             raise ValueError(
-                "Argument `add_version` accepts the following values:"
-                "('full', 'major', 'minor', 'none', True, False)."
+                "Argument `add_version` accepts the following "
+                "values: {}".format(allowed)
             )
         how = add_versions
         if isinstance(include, str):
@@ -361,8 +386,28 @@ class CondaEnvironment:
 
     @staticmethod
     def _format_version(version, how):
+        """
+        Version string formatter for loosening version requirements.
+
+        :param version: the version strings.
+        :type version: str
+
+        :param how: how to format the version. 
+        :type how: str
+
+        :returns: [str] formatted version string
+        """
+        _how = str(how).lower()
+        allowed = ('full', 'major', 'minor', 'true')
+        if _how not in allowed:
+            raise ValueError(
+                "Argument `how` only accepts the following values: {}".format(
+                    allowed
+                )
+            )
+
         n = version.count('.')
-        if (n == 0) or (how=='full') or (how is True):
+        if (n == 0) or (_how=='full') or (_how=='true'):
             return version
         if n == 1:
             major, minor = version.split('.')
@@ -370,9 +415,9 @@ class CondaEnvironment:
         if version.count('.') >= 2:
             major, minor, subs = version.split('.', 2)
 
-        if how == 'major':
+        if _how == 'major':
             return major + '.*'
-        if how == 'minor':
+        if _how == 'minor':
             if not subs:
                 return '{0}.{1}'.format(major, minor)
             return '{0}.{1}.*'.format(major, minor)
@@ -381,7 +426,11 @@ class CondaEnvironment:
 
     @staticmethod
     def get_conda_pkgs_dirs():
-        dirs_str, _, _ = run_conda('config', '--show', 'pkgs_dirs', '--json')
+        """
+        Uses the Conda Python API to retrieve the `pkgs_dirs` from the conda
+        config file.
+        """
+        dirs_str, _, _ = run_command('config', '--show', 'pkgs_dirs', '--json')
         pkgs_dirs = [
             pathlib.Path(p)
             for p in
@@ -447,4 +496,6 @@ class CondaGraph(DiGraph):
                 dep_lvls.update({dep: depth+1 for dep in deps})
         return dict(out)
 
-    
+
+class CondaImportError(ImportError):
+    pass
