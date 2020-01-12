@@ -1,3 +1,4 @@
 *.pyc
 .vscode/
 archive/
+__pycache__/
