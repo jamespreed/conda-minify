@@ -16,7 +16,7 @@ class CondaEnvironment:
     required.
     """
 
-    def __init__(self, name=None, path=None, *, conda_env_root=None):
+    def __init__(self, name=None, path=None):
         """
         Read in the packages and dependencies for the Conda environment `name`
         or located at `path`.
@@ -228,6 +228,7 @@ class CondaEnvironment:
             g.add_connections(pkg.get('simple_name'), pkg.get('depends'))
 
     def minify_requirements(self, 
+                            export_path=None,
                             include=None, 
                             exclude=None, 
                             add_versions='full',
@@ -235,6 +236,8 @@ class CondaEnvironment:
         """
         Builds a minified version of the requirements YAML.
 
+        :param export_path: The file path to write the minified requirements.
+            If not passed, no file is written.
         :param include: The packages to include in the requirements.  Defaults 
             to including only the packages with top-level dependency.  Adding
             a dependency (lower level) package allows pinning the version,
@@ -253,6 +256,7 @@ class CondaEnvironment:
 
         :returns: yaml string
 
+        :type export_path: path-like str
         :type include: list-like
         :type exclude: list-like
         :type add_version: str|bool
@@ -333,7 +337,11 @@ class CondaEnvironment:
             'dependencies': all_deps
         }
 
-        return yaml.dump(env_data, sort_keys=False)
+        yaml_str = yaml.dump(env_data, sort_keys=False)
+        if export_path:
+            with pathlib.Path(export_path).open('w') as fp:
+                fp.write(yaml_str)
+        return yaml_str
 
     @property
     def name(self):
