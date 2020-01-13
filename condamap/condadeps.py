@@ -83,7 +83,7 @@ def req_yaml_template(pip=False, version=True, build=False):
     """
     template_str = '{name}'
     if version:
-        template_str += '=={version}' if pip else ={version}'
+        template_str += '=={version}' if pip else '={version}'
     if build and not pip:
         if not version:
             template_str += '=*'
@@ -377,26 +377,31 @@ class CondaEnvironment:
         req_data = {k: self._env_packages_info[k] for k in req_names}
 
         env_data = self._construct_env_reqs(req_data)
-        version = str(add_versions).lower()!='false'
-        conda_dep_str = req_yaml_template(False, version, add_builds)
-        pip_dep_str = req_yaml_template(True, version, add_builds)
-
-        all_deps = [
-            conda_dep_str.format(name=name, **pkg)
-            for name, pkg in env_data.get('conda_deps').items()
-        ]
-        
-        if env.get('pip_deps'):
-            all_deps += [{'pip': [
-                pip_dep_str.format(name=name, **pkg)
-                for name, pkg in env.get('pip_deps').items()
-            ]}]
+        use_version = str(add_versions).lower()!='false'
+        conda_str = req_yaml_template(False, use_version, add_builds)
+        pip_str = req_yaml_template(True, use_version, add_builds)
 
         yaml_data = {
             'name': self.name,
             'channels': env_data.get('channels'),
-            'dependencies': all_deps
+            'dependencies': []
         }
+
+        dependencies = yaml_data.get('dependencies')
+        for name, pkg in env_data.get('conda_deps').items():
+            version = format_version(pkg.get('version'), add_versions)
+            dependencies.append(
+                conda_str.format(name=name, vesion=version, 
+                    build_string=pkg.get('build_string'))
+            )
+        
+        dependencies_pip = []
+        dependencies.append({'pip': dependencies_pip})
+        for name, pkg in env_data.get('pip_deps').items():
+            version = format_version(pkg.get('version'), add_versions)
+            dependencies.append(
+                pip_str.format(name=name, version=version)
+            )
 
         yaml_str = yaml.dump(yaml_data, sort_keys=False)
         self._exporter(export_path, yaml_str)
@@ -440,7 +445,7 @@ class CondaEnvironment:
         if not override:
             override = {}
 
-        pin = [self._conda_name(p) for n in pin if self._conda_name(p)]
+        pin = [self._conda_name(p) for p in pin if self._conda_name(p)]
         override = {
             self._conda_name(p): h
             for p, h in override.items()
@@ -469,17 +474,19 @@ class CondaEnvironment:
         dependencies = yaml_data.get('dependencies')
         for name, pkg in conda_deps.items():
             h = how_dict.get('name')
-            version = str(h).lower()!='false'
-            req_str = req_yaml_template(False, version)
-            dependencies.append(req_str.format(name=name, **pkg))
+            use_version = str(h).lower()!='false'
+            req_str = req_yaml_template(False, use_version)
+            version = format_version(pkg.get('version'), h)
+            dependencies.append(req_str.format(name=name, version=version))
 
         dependencies_pip = []
         dependencies.append({'pip': dependencies_pip})
         for name, pkg in pip_deps.items():
             h = how_dict.get('name')
-            version = str(h).lower()!='false'
-            req_str = req_yaml_template(True, version)
-            dependencies_pip.append(req_str.format(name=name, **pkg))
+            use_version = str(h).lower()!='false'
+            req_str = req_yaml_template(True, use_version)
+            version = format_version(pkg.get('version'), h)
+            dependencies_pip.append(req_str.format(name=name, version=version))
             
         yaml_str = yaml.dump(yaml_data, sort_keys=False)
         self._exporter(export_path, yaml_str)
@@ -496,7 +503,7 @@ class CondaEnvironment:
         """
         conda_deps = {
             name: {
-                'version': format_version(pkg.get('version'), add_versions),
+                'version': pkg.get('version'),
                 'build_string': pkg.get('build_string'),
                 'channel': pkg.get('channel')
             }
@@ -506,7 +513,7 @@ class CondaEnvironment:
         
         pip_deps = {
             name: {
-                'version': format_version(pkg.get('version'), add_versions),
+                'version': pkg.get('version'),
                 'build_string': pkg.get('build_string'),
                 'channel': pkg.get('channel')
             }
