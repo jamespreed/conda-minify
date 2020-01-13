@@ -98,7 +98,7 @@ class CondaEnvironment:
     required.
     """
 
-    _DEFAULT_CHANNELS = frozenset('pkgs/main', 'pkgs/r', 'pkgs/msys2')
+    _DEFAULT_CHANNELS = frozenset(['pkgs/main', 'pkgs/r', 'pkgs/msys2'])
 
     def __init__(self, name=None, path=None):
         """
@@ -391,7 +391,7 @@ class CondaEnvironment:
         for name, pkg in env_data.get('conda_deps').items():
             version = format_version(pkg.get('version'), add_versions)
             dependencies.append(
-                conda_str.format(name=name, vesion=version, 
+                conda_str.format(name=name, version=version, 
                     build_string=pkg.get('build_string'))
             )
         
@@ -399,7 +399,7 @@ class CondaEnvironment:
         dependencies.append({'pip': dependencies_pip})
         for name, pkg in env_data.get('pip_deps').items():
             version = format_version(pkg.get('version'), add_versions)
-            dependencies.append(
+            dependencies_pip.append(
                 pip_str.format(name=name, version=version)
             )
 
@@ -455,7 +455,7 @@ class CondaEnvironment:
             if p in override:
                 raise ValueError(
                     'The package "{0}" was referenced in both `pin` and '
-                    '`override`.  Only one of these methods can be used per'
+                    '`override`.  Only one of these methods can be used per '
                     'package.'.format(p)
                 )
         how_dict = {p: how for p in self.env_packages}
@@ -473,7 +473,7 @@ class CondaEnvironment:
 
         dependencies = yaml_data.get('dependencies')
         for name, pkg in conda_deps.items():
-            h = how_dict.get('name')
+            h = how_dict.get(name, 'false')
             use_version = str(h).lower()!='false'
             req_str = req_yaml_template(False, use_version)
             version = format_version(pkg.get('version'), h)
@@ -482,7 +482,7 @@ class CondaEnvironment:
         dependencies_pip = []
         dependencies.append({'pip': dependencies_pip})
         for name, pkg in pip_deps.items():
-            h = how_dict.get('name')
+            h = how_dict.get(name, 'false')
             use_version = str(h).lower()!='false'
             req_str = req_yaml_template(True, use_version)
             version = format_version(pkg.get('version'), h)
