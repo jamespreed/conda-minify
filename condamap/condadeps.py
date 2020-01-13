@@ -96,6 +96,9 @@ class CondaEnvironment:
         self._env_packages_name_map = {}
         self._pkgs_dirs = get_conda_pkgs_dirs()
         self.conda_graph = CondaGraph()
+        # I am restricing the default channels to those that are defined by
+        # Anaconda.  Adding a channel to defaults does not mean another person
+        # has added the same channel.
         _channels = set(get_conda_default_channels())
         _channels.intersection_update(self._DEFAULT_CHANNELS)
         self.default_channels = _channels
@@ -351,10 +354,10 @@ class CondaEnvironment:
             exclude = []
         include = set(c for c in map(self._conda_name, include) if c)
         exclude = set(c for c in map(self._conda_name, exclude) if c)
+        # add dependencies to the inclusions
         if add_exclusion_deps:
-            include_2 = set()
             for e in exclude:
-                include_2.update(self.conda_graph.get_package_dependencies(e))
+                include.update(self.conda_graph.get_package_dependencies(e))
 
         req_names = set(map(self._conda_name, 
             self.conda_graph.highest_dependents()))
