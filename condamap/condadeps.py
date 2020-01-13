@@ -18,7 +18,7 @@ def format_version(version, how):
     :returns: [str] formatted version string
     """
     _how = str(how).lower()
-    allowed = ('full', 'major', 'minor', 'true')
+    allowed = ('full', 'major', 'minor', 'true', 'false')
     if _how not in allowed:
         raise ValueError(
             "Argument `how` only accepts the following values: {}".format(
@@ -27,12 +27,12 @@ def format_version(version, how):
         )
 
     n = version.count('.')
-    if (n == 0) or (_how=='full') or (_how=='true'):
+    if (n == 0) or (_how == 'full') or (_how == 'true'):
         return version
     if n == 1:
         major, minor = version.split('.')
         subs = ''
-    if version.count('.') >= 2:
+    if n >= 2:
         major, minor, subs = version.split('.', 2)
 
     if _how == 'major':
@@ -41,6 +41,7 @@ def format_version(version, how):
         if not subs:
             return '{0}.{1}'.format(major, minor)
         return '{0}.{1}.*'.format(major, minor)
+    return version
 
 def get_conda_default_channels():
     """
@@ -69,6 +70,25 @@ def get_conda_pkgs_dirs():
     ]
     return pkgs_dirs
 
+def req_yaml_template(pip=False, version=True, build=False):
+    """
+    Builds a template string for requirement lines in the YAML format.
+
+    :pip: [bool] Whether to build a Conda requirement line or a pip line
+    :version: [bool] Includes the version template
+    :build: [bool] Includes the build template.  Makes version "=*" if the 
+        `version` is False for Conda packages.
+
+    :returns: [str] The requirement string template.
+    """
+    template_str = '{name}'
+    if version:
+        template_str += '=={version}' if pip else ={version}'
+    if build and not pip:
+        if not version:
+            template_str += '=*'
+        template_str += '={build_string}'
+    return template_str
 
 class CondaEnvironment:
     """
@@ -327,7 +347,7 @@ class CondaEnvironment:
               'full' or 'true' or True- Include the exact version
               'major' - Include the major value of the version only ('1.*')
               'minor' - Include the major and minor versions ('1.11.*')
-              'none' or 'false' or False - Version not added.
+              'false' or False - Version not added.
         :add_builds: [bool]
             Add the build number to the requirment, highly specific and will 
             override loosening of version requirements.
@@ -336,14 +356,6 @@ class CondaEnvironment:
             The YAML string for the environment spec.
         """
         # convert strings to lists, None to empty
-        allowed = ('full', 'major', 'minor', 'none', 'true', 'false')
-        add_versions = str(add_versions).lower()
-        if add_versions not in allowed:
-            raise ValueError(
-                "Argument `add_version` accepts the following "
-                "values: {}".format(allowed)
-            )
-        how = add_versions
         if isinstance(include, str):
             include = [include]
         if isinstance(exclude, str):
@@ -364,14 +376,142 @@ class CondaEnvironment:
         req_names = req_names.union(include).difference(exclude)
         req_data = {k: self._env_packages_info[k] for k in req_names}
 
+        env_data = self._construct_env_reqs(req_data)
+        version = str(add_versions).lower()!='false'
+        conda_dep_str = req_yaml_template(False, version, add_builds)
+        pip_dep_str = req_yaml_template(True, version, add_builds)
+
+        all_deps = [
+            conda_dep_str.format(name=name, **pkg)
+            for name, pkg in env_data.get('conda_deps').items()
+        ]
+        
+        if env.get('pip_deps'):
+            all_deps += [{'pip': [
+                pip_dep_str.format(name=name, **pkg)
+                for name, pkg in env.get('pip_deps').items()
+            ]}]
+
+        yaml_data = {
+            'name': self.name,
+            'channels': env_data.get('channels'),
+            'dependencies': all_deps
+        }
+
+        yaml_str = yaml.dump(yaml_data, sort_keys=False)
+        self._exporter(export_path, yaml_str)
+        return yaml_str
+
+    def relax_requirements(self, 
+                           export_path=None, 
+                           how='minor', 
+                           pin=None, 
+                           override=None):
+        """
+        Builds a requirement YAML for the entire environment with relaxed 
+        requirements.
+
+        :export_path: [str|Path]
+            The file path to write the minified requirements. If not passed,
+            no file is written.
+        :how: [str|bool]
+            The default method for how the requirements will be relaxed.  Using
+            the `pin` or `override` arguments takes precedence over this value.
+              'full' or 'true' or True- Include the exact version
+              'major' - Include the major value of the version only ('1.*')
+              'minor' - Include the major and minor versions ('1.11.*')
+              'false' or False - Version not added.
+        :pin: [list]
+            Which packages will have their full version pinned to the current
+            version in the environment.  Packages not in the environment are
+            ignored.
+        :override: [dict]
+            Keys are the package names; values are the `how` methods to use for
+            that specific package.  The same package cannot be listed in `pin`
+            and `override`.  Packages not in the environment are ignored.
+
+        :returns: [str]
+            The YAML string with relaxed requirements.
+        """
+        if isinstance(pin, str):
+            pin = [pin]
+        if not pin:
+            pin = []
+        if not override:
+            override = {}
+
+        pin = [self._conda_name(p) for n in pin if self._conda_name(p)]
+        override = {
+            self._conda_name(p): h
+            for p, h in override.items()
+            if self._conda_name(p)
+        }
+        for p in pin:
+            if p in override:
+                raise ValueError(
+                    'The package "{0}" was referenced in both `pin` and '
+                    '`override`.  Only one of these methods can be used per'
+                    'package.'.format(p)
+                )
+        how_dict = {p: how for p in self.env_packages}
+        how_dict.update({p: 'full' for p in pin})
+        how_dict.update(override)
+
+        env_data = self._construct_env_reqs(self.env_packages_info)
+        conda_deps = env_data.get('conda_deps', {})
+        pip_deps = env_data.get('pip_deps', {})
+        yaml_data = {
+            'name': self.name,
+            'channels': env_data.get('channels'),
+            'dependencies': []
+        }
+
+        dependencies = yaml_data.get('dependencies')
+        for name, pkg in conda_deps.items():
+            h = how_dict.get('name')
+            version = str(h).lower()!='false'
+            req_str = req_yaml_template(False, version)
+            dependencies.append(req_str.format(name=name, **pkg))
+
+        dependencies_pip = []
+        dependencies.append({'pip': dependencies_pip})
+        for name, pkg in pip_deps.items():
+            h = how_dict.get('name')
+            version = str(h).lower()!='false'
+            req_str = req_yaml_template(True, version)
+            dependencies_pip.append(req_str.format(name=name, **pkg))
+            
+        yaml_str = yaml.dump(yaml_data, sort_keys=False)
+        self._exporter(export_path, yaml_str)
+        return yaml_str
+
+    def _construct_env_reqs(self, packages):
+        """
+        Takes a dictionary of packages and returns a dictionary with
+        environment info needed to construct the YAML.
+
+        :packages: [dict] package name key; package info values
+
+        :returns: [dict] 
+        """
         conda_deps = {
             name: {
-                'version': format_version(pkg.get('version'), how),
+                'version': format_version(pkg.get('version'), add_versions),
                 'build_string': pkg.get('build_string'),
                 'channel': pkg.get('channel')
             }
-            for name, pkg in req_data.items()
+            for name, pkg in packages.items()
             if pkg.get('channel') != 'pypi'
+        }
+        
+        pip_deps = {
+            name: {
+                'version': format_version(pkg.get('version'), add_versions),
+                'build_string': pkg.get('build_string'),
+                'channel': pkg.get('channel')
+            }
+            for name, pkg in packages.items()
+            if pkg.get('channel') == 'pypi'
         }
 
         # set default channels first i guess?
@@ -380,46 +520,15 @@ class CondaEnvironment:
             for d in conda_deps.values()
         )
         channels = sorted(channels, key=lambda x: x!='defaults')
-        
-        pip_deps = {
-            name: {
-                'version': format_version(pkg.get('version'), how),
-                'build_string': pkg.get('build_string'),
-                'channel': pkg.get('channel')
-            }
-            for name, pkg in req_data.items()
-            if pkg.get('channel') == 'pypi'
-        }
-
-        conda_dep_str = '{name}'
-        pip_dep_str = '{name}'
-        if add_versions:
-            conda_dep_str += '={version}'
-            pip_dep_str += '=={version}'
-        if add_builds:
-            if not add_versions:
-                conda_dep_str += '=*'
-            conda_dep_str += '={build_string}'
-
-        all_deps = [
-            conda_dep_str.format(name=name, **pkg)
-            for name, pkg in conda_deps.items()
-        ]
-        if pip_deps:
-            all_deps += [{'pip': [
-                pip_dep_str.format(name=name, **pkg)
-                for name, pkg in pip_deps.items()
-            ]}]
 
         env_data = {
             'name': self.name,
             'channels': channels,
-            'dependencies': all_deps
+            'conda_deps': conda_deps,
+            'pip_deps': pip_deps
         }
 
-        yaml_str = yaml.dump(env_data, sort_keys=False)
-        self._exporter(export_path, yaml_str)
-        return yaml_str
+        return env_data
 
     def _to_default(self, c):
         if c in self.default_channels:
@@ -454,6 +563,7 @@ class CondaEnvironment:
             'build_string', 
             'channel', 
             'depends', 
+            #'name',
             'platform', 
             'simple_name',
             'subdir', 
