@@ -5,7 +5,69 @@ import yaml
 from collections import defaultdict
 from conda.cli.python_api import run_command
 from conda.exceptions import EnvironmentLocationNotFound
-from .graph import DiGraph
+from .graph import DirectedAcyclicGraph
+
+
+def format_version(version, how):
+    """
+    Version string formatter for loosening version requirements.
+
+    :version: [str] the version strings.
+    :how: [str|bool] how to format the version. 
+
+    :returns: [str] formatted version string
+    """
+    _how = str(how).lower()
+    allowed = ('full', 'major', 'minor', 'true')
+    if _how not in allowed:
+        raise ValueError(
+            "Argument `how` only accepts the following values: {}".format(
+                allowed
+            )
+        )
+
+    n = version.count('.')
+    if (n == 0) or (_how=='full') or (_how=='true'):
+        return version
+    if n == 1:
+        major, minor = version.split('.')
+        subs = ''
+    if version.count('.') >= 2:
+        major, minor, subs = version.split('.', 2)
+
+    if _how == 'major':
+        return major + '.*'
+    if _how == 'minor':
+        if not subs:
+            return '{0}.{1}'.format(major, minor)
+        return '{0}.{1}.*'.format(major, minor)
+
+def get_conda_default_channels():
+    """
+    Uses the Conda Python API to retrieve the default channels from the conda
+    config file.
+
+    :returns: [list] the default channels used by the Conda executable.
+    """
+    channel_str, _, _ = run_command('config', '--show', 
+        'default_channels', '--json')
+    channels = json.loads(channel_str)
+    return [c.get('name') for c in channels.get('default_channels', [])]
+
+def get_conda_pkgs_dirs():
+    """
+    Uses the Conda Python API to retrieve the `pkgs_dirs` from the conda
+    config file.
+
+    :returns: [list] pathlib.Path objects for each path.
+    """
+    dirs_str, _, _ = run_command('config', '--show', 'pkgs_dirs', '--json')
+    pkgs_dirs = [
+        pathlib.Path(p)
+        for p in
+        json.loads(dirs_str).get('pkgs_dirs', [])
+    ]
+    return pkgs_dirs
 
 
 class CondaEnvironment:
@@ -16,25 +78,27 @@ class CondaEnvironment:
     required.
     """
 
+    _DEFAULT_CHANNELS = frozenset('pkgs/main', 'pkgs/r', 'pkgs/msys2')
+
     def __init__(self, name=None, path=None):
         """
         Read in the packages and dependencies for the Conda environment `name`
         or located at `path`.
 
-        :param name: the name of the Conda environment.
-        :param path: the path to the Conda environment, use if the environment 
+        :name: [str] the name of the Conda environment.
+        :path: [str] the path to the Conda environment, use if the environment 
             is located in a directory not known by Conda.  If `name` is 
             passed, `path` is ignored.
-
-        :type name: str
-        :type path: str
         """
         self._name = None
         self._path = None
         self._env_packages_info = {}
         self._env_packages_name_map = {}
-        self._pkgs_dirs = self.get_conda_pkgs_dirs()
+        self._pkgs_dirs = get_conda_pkgs_dirs()
         self.conda_graph = CondaGraph()
+        _channels = set(get_conda_default_channels())
+        _channels.intersection_update(self._DEFAULT_CHANNELS)
+        self.default_channels = _channels
 
         if not name and not path:
             raise ValueError('Either the `name` or `path` of the Conda '
@@ -71,7 +135,7 @@ class CondaEnvironment:
         change to the environment has been made after this object was 
         initialized.
 
-        :returns: list[dict]
+        :returns: [list] list of dictionaries containing package metadata
         """
         pkgs_str, _, _ = run_command('list', '-p', self.path, '--json')
         return json.loads(pkgs_str)
@@ -107,10 +171,9 @@ class CondaEnvironment:
         Search for the package's index.json file in the Conda `pkgs_dirs`
         locations.  Returns a copy of `pkg` with the updated metadata. 
 
-        :param pkg: the package metadata, must include `dist_name`
-        :type pkg: dict
+        :pkg: [dict] the package metadata, must include `dist_name`
 
-        :returns: dict
+        :returns: [dict] the package metadata including the Conda metadata.
         """
         paths = [
             d.joinpath(pkg['dist_name'], 'info', 'index.json')
@@ -133,9 +196,9 @@ class CondaEnvironment:
         This modifies the `pkg` in-place if the name has a dash.
         Returns the path to the PyPi metadata file or None.
 
-        :param pkg: the package metadata, must include `name` and `version`
-        :type pkg: dict
-        :returns: pathlib.Path or None
+        :pkg: [dict] the package metadata, must include `name` and `version`
+
+        :returns: [pathlib.Path|None]
         """
         pkg_name = pkg.get('name')
         pkg_version = pkg.get('version')
@@ -158,10 +221,9 @@ class CondaEnvironment:
         Search for a PyPi package's METADATA file in the Lib/site-packages
         directory of the environment.
 
-        :param pkg: the package metadata, must include `name` and `version`
-        :type pkg: dict
+        :pkg: [dict] the package metadata, must include `name` and `version`
 
-        :returns: dict
+        :returns: [dict] the package metadata including the PyPi metadata.
         """
         out = pkg.copy()
         path = self.get_pypi_pkg_path(out)
@@ -214,8 +276,9 @@ class CondaEnvironment:
         """
         Finds and returns the package information with `pkg_name`.
 
-        :param pkg_name: the name of the package
-        :type pkg_name: str
+        :pkg_name: [str] the name of the package.
+
+        :returns: [dict] dictionary of the package metadata.
         """
         return self.env_packages_info.get(self._conda_name(pkg_name), {})
 
@@ -231,36 +294,43 @@ class CondaEnvironment:
                             export_path=None,
                             include=None, 
                             exclude=None, 
+                            add_exclusion_deps=False,
                             add_versions='full',
                             add_builds=False):
         """
-        Builds a minified version of the requirements YAML.
+        Builds a minified version of the requirements spec in YAML format.
 
-        :param export_path: The file path to write the minified requirements.
-            If not passed, no file is written.
-        :param include: The packages to include in the requirements.  Defaults 
-            to including only the packages with top-level dependency.  Adding
-            a dependency (lower level) package allows pinning the version,
+        :export_path: [str|Path]
+            The file path to write the minified requirements. If not passed,
+            no file is written.
+        :include: [list-like]
+            The packages to include in the requirements.  Defaults to
+            including only the packages with top-level dependency.  Adding a
+            dependency (lower level) package allows pinning the version, 
             build, and channel.
-        :param exclude: Packages to exclude from the requirments. Only removes 
-            top-level dependency packages.  Useful for exporting computation
-            without visualization.  I.e. ``exclude=['matplotlib']``.
-        :param add_versions: Add part of or the full version to the 
-            requirements. Allowed values are: 
+        :exclude: [list-like]
+            Packages to exclude from the requirments. Only removes top-level 
+            dependency packages.  Useful for exporting computation without 
+            visualization.  E.g. ``exclude=['matplotlib']``.
+        :add_exclusion_deps: [bool]
+            Whether to add dependencies of excluded packages to the minified 
+            spec.  E.g. using 
+            ``exclude=['pandas'], add_exclusion_deps=True`` removes 'pandas' 
+            from the spec, but adds 'numpy', 'python_dateutil', and 'pytz', 
+            the next level of dependencies for pandas.
+        :add_versions: [str|bool]
+            Add part of or the full version to the requirements. 
+            Allowed values are: 
               'full' or 'true' or True- Include the exact version
               'major' - Include the major value of the version only ('1.*')
               'minor' - Include the major and minor versions ('1.11.*')
               'none' or 'false' or False - Version not added.
-        :param add_builds: Add the build number to the requirment, highly 
-            specific and will override loosening of version requirements.
+        :add_builds: [bool]
+            Add the build number to the requirment, highly specific and will 
+            override loosening of version requirements.
 
-        :returns: yaml string
-
-        :type export_path: path-like str
-        :type include: list-like
-        :type exclude: list-like
-        :type add_version: str|bool
-        :type add_builds: bool
+        :returns: [str]
+            The YAML string for the environment spec.
         """
         # convert strings to lists, None to empty
         allowed = ('full', 'major', 'minor', 'none', 'true', 'false')
@@ -281,15 +351,19 @@ class CondaEnvironment:
             exclude = []
         include = set(c for c in map(self._conda_name, include) if c)
         exclude = set(c for c in map(self._conda_name, exclude) if c)
+        if add_exclusion_deps:
+            include_2 = set()
+            for e in exclude:
+                include_2.update(self.conda_graph.get_package_dependencies(e))
 
         req_names = set(map(self._conda_name, 
-            self.conda_graph.get_highest_dependents()))
+            self.conda_graph.highest_dependents()))
         req_names = req_names.union(include).difference(exclude)
         req_data = {k: self._env_packages_info[k] for k in req_names}
 
         conda_deps = {
             name: {
-                'version': self._format_version(pkg.get('version'), how),
+                'version': format_version(pkg.get('version'), how),
                 'build_string': pkg.get('build_string'),
                 'channel': pkg.get('channel')
             }
@@ -298,12 +372,15 @@ class CondaEnvironment:
         }
 
         # set default channels first i guess?
-        channels = set(d.get('channel') for d in conda_deps.values())
-        channels = sorted(channels, key=lambda x: 'pkgs/' not in x)
+        channels = set(
+            self._to_default(d.get('channel')) 
+            for d in conda_deps.values()
+        )
+        channels = sorted(channels, key=lambda x: x!='defaults')
         
         pip_deps = {
             name: {
-                'version': self._format_version(pkg.get('version'), how),
+                'version': format_version(pkg.get('version'), how),
                 'build_string': pkg.get('build_string'),
                 'channel': pkg.get('channel')
             }
@@ -338,10 +415,18 @@ class CondaEnvironment:
         }
 
         yaml_str = yaml.dump(env_data, sort_keys=False)
+        self._exporter(export_path, yaml_str)
+        return yaml_str
+
+    def _to_default(self, c):
+        if c in self.default_channels:
+            return 'defaults'
+        return c
+
+    def _exporter(self, export_path, x):
         if export_path:
             with pathlib.Path(export_path).open('w') as fp:
-                fp.write(yaml_str)
-        return yaml_str
+                fp.write(x)
 
     @property
     def name(self):
@@ -393,60 +478,6 @@ class CondaEnvironment:
         return str(pkg_name).lower().replace('-', '_').replace('.', '_')
 
     @staticmethod
-    def _format_version(version, how):
-        """
-        Version string formatter for loosening version requirements.
-
-        :param version: the version strings.
-        :type version: str
-
-        :param how: how to format the version. 
-        :type how: str
-
-        :returns: [str] formatted version string
-        """
-        _how = str(how).lower()
-        allowed = ('full', 'major', 'minor', 'true')
-        if _how not in allowed:
-            raise ValueError(
-                "Argument `how` only accepts the following values: {}".format(
-                    allowed
-                )
-            )
-
-        n = version.count('.')
-        if (n == 0) or (_how=='full') or (_how=='true'):
-            return version
-        if n == 1:
-            major, minor = version.split('.')
-            subs = ''
-        if version.count('.') >= 2:
-            major, minor, subs = version.split('.', 2)
-
-        if _how == 'major':
-            return major + '.*'
-        if _how == 'minor':
-            if not subs:
-                return '{0}.{1}'.format(major, minor)
-            return '{0}.{1}.*'.format(major, minor)
-
-    #TODO: add default channel extraction
-
-    @staticmethod
-    def get_conda_pkgs_dirs():
-        """
-        Uses the Conda Python API to retrieve the `pkgs_dirs` from the conda
-        config file.
-        """
-        dirs_str, _, _ = run_command('config', '--show', 'pkgs_dirs', '--json')
-        pkgs_dirs = [
-            pathlib.Path(p)
-            for p in
-            json.loads(dirs_str).get('pkgs_dirs', [])
-        ]
-        return pkgs_dirs
-
-    @staticmethod
     def _parse_list_header(header):
         path = pathlib.Path(
             header.split('\n')[0]
@@ -456,16 +487,16 @@ class CondaEnvironment:
         return path
 
 
-class CondaGraph(DiGraph):
+class CondaGraph(DirectedAcyclicGraph):
 
-    def get_lowest_dependencies(self):
+    def lowest_dependencies(self):
         """
         Returns a list of the packages which do not depend on any other 
         package in the environment.  These are the roots of the graph.
         """
         return [k for k in self._inward if not self._outward.get(k)]
 
-    def get_highest_dependents(self):
+    def highest_dependents(self):
         """
         Returns a list of packages which are not a dependency for another
         package in the environment.  These are the leaves of the graph.
