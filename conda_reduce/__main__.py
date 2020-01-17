@@ -1,8 +1,8 @@
-import sys
 from .condadeps import CondaEnvironment
 
 
-def main(args):
+def main():
+    import sys
     import argparse
     import textwrap as _textwrap
     from argparse import RawTextHelpFormatter, ArgumentDefaultsHelpFormatter
@@ -22,7 +22,9 @@ def main(args):
         help='The file path for export.  Leave off to print output to screen.')
 
     # create two method verbs that can be called
-    subparsers = parser.add_subparsers(title='methods', dest='method',
+    subparsers = parser.add_subparsers(title='method (required)', 
+        dest='method', 
+        required=True,
         help='minify: exports the environment with the minimal package specs '
             'needed for a similar Codna environment.\nrelax: exports the '
             'entire environment spec with relaxed version numbers.')
@@ -72,11 +74,11 @@ def main(args):
             'passed multiple times:\n'
             '... --how major -o pandas full -o numpy major')
 
-    if len(args)<=1:
+    if len(sys.argv) <= 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
 
-    args = parser.parse_args(args)
+    args = parser.parse_args()
     # check for path characters in name
     if ('/' in args.name) or ('\\' in args.name):
         args.path = args.name
@@ -108,4 +110,4 @@ def main(args):
         print(yaml_str)
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    main()
