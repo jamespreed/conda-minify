@@ -2,3 +2,4 @@
 .vscode/
 archive/
 __pycache__/
+conda_reduce.egg-info/
