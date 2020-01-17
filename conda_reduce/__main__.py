@@ -99,7 +99,6 @@ def main(args):
         yaml_str = cenv.relax_requirements(
             export_path=args.file,
             how=args.how,
-            exclude=args.exclude,
             pin=args.pin,
             override=dict(args.override) if args.override else None
         )
