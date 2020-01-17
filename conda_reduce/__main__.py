@@ -4,15 +4,22 @@ from .condadeps import CondaEnvironment
 
 def main(args):
     import argparse
+    import textwrap as _textwrap
     from argparse import RawTextHelpFormatter, ArgumentDefaultsHelpFormatter
 
     class MyHelpFormatter(RawTextHelpFormatter, ArgumentDefaultsHelpFormatter):
-        pass
+        def _split_lines(self, text, width):
+            return [w for t in text.splitlines() 
+                      for w in _textwrap.wrap(t, width)]
 
     parser = argparse.ArgumentParser(prog='CondaDeps',
-        description='Maps dependencies in a Conda environment and builds '
-            'minimized requirement specs to share environments.',
+        description='Builds minimized Conda specs to share environments.',
         formatter_class=MyHelpFormatter)
+    parser.add_argument('name',
+        help='The environment name to export. Use of a forward or backslash '
+            'in the name converts the name to a path for the environment.')
+    parser.add_argument('-f', '--file', default=None,
+        help='The file path for export.  Leave off to print output to screen.')
 
     # create two method verbs that can be called
     subparsers = parser.add_subparsers(title='methods', dest='method',
@@ -23,14 +30,9 @@ def main(args):
         formatter_class=MyHelpFormatter)
     relax_parser = subparsers.add_parser('relax', 
         formatter_class=MyHelpFormatter)    
-    parser.add_argument('-f', '--file', default=None,
-        help='The file path for export.')
 
     #######################
     # method: minify option
-    minify_parser.add_argument('name',
-        help='The environment name to export. Use of a forward or backslash '
-            'in the name converts the name to a path for the environment.')
     minify_parser.add_argument('-i', '--include', action='append',
         help='Additional ackages to include in the spec.  Can be passed '
             'multiple times:\n  `... -i pkg1 -i pkg2`')
@@ -41,8 +43,8 @@ def main(args):
         choices=['full', 'major', 'minor', 'none', 'true', 'false'],
         help='Controls how the version strings are added: \n'
             "- 'full' or 'true': Include the exact version.\n"
-            "- 'major': Include the major value of the version only ('1.*').\n"  
-            "- 'minor': Include the major and minor versions ('1.11.*').\n" 
+            "- 'major': Include major value only ('1.*').\n"  
+            "- 'minor': Include major and minor ('1.11.*').\n" 
             "- 'none' or 'false': Version not added.\n")
     minify_parser.add_argument('--add_builds', action='store_true', 
         help='Add the build number to the requirment. This is highly '
@@ -50,28 +52,25 @@ def main(args):
 
     #######################
     # method: relax options
-    relax_parser.add_argument('name',
-        help='The environment name to export. Use of a forward or backslash '
-            'in the name converts the name to a path for the environment.')
     relax_parser.add_argument('--how', default='minor',
         choices=['full', 'major', 'minor', 'none', 'true', 'false'],
         help="The default method for how requirements are relaxed.  Using "
             "the `pin` or `override` arguments takes precedence over this "
             "value.\n"
             "- 'full' or 'true': Include the exact version\n"
-            "- 'major': Include the major value of the version only ('1.*')\n"
-            "- 'minor': Include the major and minor versions ('1.11.*')\n"
+            "- 'major': Include the major value only ('1.*')\n"
+            "- 'minor': Include the major and minor ('1.11.*')\n"
             "- 'none' or 'false': Version not added.)\n")
     relax_parser.add_argument('-p', '--pin', action='append',
         help='Sets which packages will have their full version pinned to the '
             'version in the environment.  Packages not in the environment are '
             'ignored.  Can be passed multiple times:\n'
-            '  `... -p numpy -p pandas`')
+            '... -p numpy -p pandas\n')
     relax_parser.add_argument('-o', '--override', action='append', nargs=2,
         help='Allows overriding the default `how` setting for any package. '
             'Takes 2 arguments, the package name the new `how` method. Can be '
             'passed multiple times:\n'
-            '  `... --how major -o pandas full -o numpy major`')
+            '... --how major -o pandas full -o numpy major')
 
     if len(args)<=1:
         parser.print_help(sys.stderr)
