@@ -12,9 +12,9 @@ It was not an uncommon occurance for me to run into issues when trying to use an
 Conda Reduce provides a simple way to produce an environment specification YAML file wiht only the minimum requirements needed to approximately reproduce the environment.  After that, Conda can figure out the rest of the details for the dependencies.  For example, if you have an environment with Pandas and Matplotib; sharing the environment really only requires specifying Pandas and Matplotib and their versions.
 
 ## Installation
-### Using Conda
+### Via Conda
 (TODO)
-### Using PIP
+### Via PIP
 (TODO)
 
 ## Usage
