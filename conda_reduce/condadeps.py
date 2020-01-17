@@ -318,7 +318,7 @@ class CondaEnvironment:
                             include=None, 
                             exclude=None, 
                             add_exclusion_deps=False,
-                            add_versions='full',
+                            how='full',
                             add_builds=False):
         """
         Builds a minified version of the requirements spec in YAML format.
@@ -341,8 +341,8 @@ class CondaEnvironment:
             ``exclude=['pandas'], add_exclusion_deps=True`` removes 'pandas' 
             from the spec, but adds 'numpy', 'python_dateutil', and 'pytz', 
             the next level of dependencies for pandas.
-        :add_versions: [str|bool]
-            Add part of or the full version to the requirements. 
+        :how: [str|bool]
+            Controls how the version for each package is formatted. 
             Allowed values are: 
               'full' or 'true' or True- Include the exact version
               'major' - Include the major value of the version only ('1.*')
@@ -377,7 +377,7 @@ class CondaEnvironment:
         req_data = {k: self._env_packages_info[k] for k in req_names}
 
         env_data = self._construct_env_reqs(req_data)
-        use_version = str(add_versions).lower() not in ('false', 'none')
+        use_version = str(how).lower() not in ('false', 'none')
         conda_str = req_yaml_template(False, use_version, add_builds)
         pip_str = req_yaml_template(True, use_version, add_builds)
 
@@ -389,7 +389,7 @@ class CondaEnvironment:
 
         dependencies = yaml_data.get('dependencies')
         for name, pkg in env_data.get('conda_deps').items():
-            version = format_version(pkg.get('version'), add_versions)
+            version = format_version(pkg.get('version'), how)
             dependencies.append(
                 conda_str.format(name=name, version=version, 
                     build_string=pkg.get('build_string'))
@@ -398,7 +398,7 @@ class CondaEnvironment:
         dependencies_pip = []
         dependencies.append({'pip': dependencies_pip})
         for name, pkg in env_data.get('pip_deps').items():
-            version = format_version(pkg.get('version'), add_versions)
+            version = format_version(pkg.get('version'), how)
             dependencies_pip.append(
                 pip_str.format(name=name, version=version)
             )

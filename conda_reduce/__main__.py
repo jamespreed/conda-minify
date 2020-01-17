@@ -41,7 +41,7 @@ def main():
     minify_parser.add_argument('-e', '--exclude', action='append', 
         help='Packages to exclude from the spec.  Can be passed multiple '
             'times:\n  `... -e pkg1 -e pkg2`')
-    minify_parser.add_argument('--add_versions', default='full', 
+    minify_parser.add_argument('--how', default='full', 
         choices=['full', 'major', 'minor', 'none', 'true', 'false'],
         help='Controls how the version strings are added: \n'
             "- 'full' or 'true': Include the exact version.\n"
@@ -93,7 +93,7 @@ def main():
             export_path=args.file,
             include=args.include,
             exclude=args.exclude,
-            add_versions=args.add_versions,
+            how=args.how,
             add_builds=args.add_builds
         )
     if args.method == 'relax':
