@@ -35,12 +35,6 @@ def main():
 
     #######################
     # method: minify option
-    minify_parser.add_argument('-i', '--include', action='append',
-        help='Additional ackages to include in the spec.  Can be passed '
-            'multiple times:\n  `... -i pkg1 -i pkg2`')
-    minify_parser.add_argument('-e', '--exclude', action='append', 
-        help='Packages to exclude from the spec.  Can be passed multiple '
-            'times:\n  `... -e pkg1 -e pkg2`')
     minify_parser.add_argument('--how', default='full', 
         choices=['full', 'major', 'minor', 'none'],
         help='Controls how the version strings are added: \n'
@@ -48,6 +42,18 @@ def main():
             "- 'major': Include major value only ('1.*').\n"  
             "- 'minor': Include major and minor ('1.11.*').\n" 
             "- 'none' or 'false': Version not added.\n")
+    minify_parser.add_argument('-i', '--include', action='append',
+        help='Additional ackages to include in the spec.  Can be passed '
+            'multiple times:\n  ... -i pkg1 -i pkg2')
+    minify_parser.add_argument('-e', '--exclude', action='append', 
+        help='Packages to exclude from the spec.  Can be passed multiple '
+            'times:\n  ... -e pkg1 -e pkg2')
+    minify_parser.add_argument('--add_exclusion_deps', action='store_true',
+        help='Whether to add dependencies of excluded packages to the '
+            'minified spec.  E.g. using:n'
+            '  ... --exclude pandas --add_exclusion_deps\n' 
+            'removes pandas from the spec, but adds numpy, python_dateutil, '
+            'and pytz - the next level of dependencies for pandas.')
     minify_parser.add_argument('--add_builds', action='store_true', 
         help='Add the build number to the requirment. This is highly '
             'specific and will override loosening of version requirements.')
@@ -67,12 +73,12 @@ def main():
         help='Sets which packages will have their full version pinned to the '
             'version in the environment.  Packages not in the environment are '
             'ignored.  Can be passed multiple times:\n'
-            '... -p numpy -p pandas\n')
+            '  ... -p numpy -p pandas\n')
     relax_parser.add_argument('-o', '--override', action='append', nargs=2,
         help='Allows overriding the default `how` setting for any package. '
             'Takes 2 arguments, the package name the new `how` method. Can be '
             'passed multiple times:\n'
-            '... --how major -o pandas full -o numpy major')
+            '  ... --how major -o pandas full -o numpy major')
 
     if len(sys.argv) <= 1:
         parser.print_help(sys.stderr)
@@ -93,6 +99,7 @@ def main():
             export_path=args.file,
             include=args.include,
             exclude=args.exclude,
+            add_exclusion_deps=args.add_exclusion_deps,
             how=args.how,
             add_builds=args.add_builds
         )
