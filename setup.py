@@ -32,7 +32,7 @@ setup(
         'Programming Language :: Python :: 3.8',
     ],
     keywords='conda virtual environment yaml',
-    packages=['conda_reduce']
+    packages=['conda_reduce'],
     python_requires='>=3.4, <4',
     install_requires=['conda>=4.3.0'],
     entry_points={  # Optional
