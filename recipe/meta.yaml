@@ -1,9 +1,8 @@
-{% set name = "conda-recude" %}
-{% set version = "0.0.2" %}
+{% set data = load_setup_py_data() %}
 
 package:
-  name: "{{ name|lower }}"
-  version: "{{ version }}"
+  name: "{{ data.name|lower }}"
+  version: "{{ data.version }}"
 
 source:
   url: "none yet"
@@ -20,6 +19,7 @@ requirements:
     - python >=3.4
   run:
     - python >=3.4
+    - conda >=4.3.0
 
 test:
   imports:
