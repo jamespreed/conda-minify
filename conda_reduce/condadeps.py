@@ -107,8 +107,8 @@ class CondaEnvironment:
 
         :name: [str] the name of the Conda environment.
         :path: [str] the path to the Conda environment, use if the environment 
-            is located in a directory not known by Conda.  If `name` is 
-            passed, `path` is ignored.
+            is located in a directory not known by Conda.  If `path` is 
+            passed, `name` is ignored.
         """
         self._name = None
         self._path = None
@@ -126,10 +126,10 @@ class CondaEnvironment:
         if not name and not path:
             raise ValueError('Either the `name` or `path` of the Conda '
                 'environment is required.')
-        if name:
-            self._init_from_name(name)
-        elif path:
+        if path:
             self._init_from_path(path)
+        elif name:
+            self._init_from_name(name)
         self.load_package_metadata()
             
     def _init_from_name(self, name):
