@@ -18,7 +18,7 @@ def format_version(version, how):
     :returns: [str] formatted version string
     """
     _how = str(how).lower()
-    allowed = ('full', 'major', 'minor', 'true', 'false')
+    allowed = ('full', 'major', 'minor', 'true', 'false', 'none')
     if _how not in allowed:
         raise ValueError(
             "Argument `how` only accepts the following values: {}".format(
@@ -347,7 +347,7 @@ class CondaEnvironment:
               'full' or 'true' or True- Include the exact version
               'major' - Include the major value of the version only ('1.*')
               'minor' - Include the major and minor versions ('1.11.*')
-              'false' or False - Version not added.
+              'none' or 'false' or False - Version not added.
         :add_builds: [bool]
             Add the build number to the requirment, highly specific and will 
             override loosening of version requirements.
@@ -377,7 +377,7 @@ class CondaEnvironment:
         req_data = {k: self._env_packages_info[k] for k in req_names}
 
         env_data = self._construct_env_reqs(req_data)
-        use_version = str(add_versions).lower()!='false'
+        use_version = str(add_versions).lower() not in ('false', 'none')
         conda_str = req_yaml_template(False, use_version, add_builds)
         pip_str = req_yaml_template(True, use_version, add_builds)
 
@@ -425,7 +425,7 @@ class CondaEnvironment:
               'full' or 'true' or True- Include the exact version
               'major' - Include the major value of the version only ('1.*')
               'minor' - Include the major and minor versions ('1.11.*')
-              'false' or False - Version not added.
+              'none' or 'false' or False - Version not added.
         :pin: [list]
             Which packages will have their full version pinned to the current
             version in the environment.  Packages not in the environment are
@@ -474,7 +474,7 @@ class CondaEnvironment:
         dependencies = yaml_data.get('dependencies')
         for name, pkg in conda_deps.items():
             h = how_dict.get(name, 'false')
-            use_version = str(h).lower()!='false'
+            use_version = str(h).lower() not in ('false', 'none')
             req_str = req_yaml_template(False, use_version)
             version = format_version(pkg.get('version'), h)
             dependencies.append(req_str.format(name=name, version=version))
@@ -483,7 +483,7 @@ class CondaEnvironment:
         dependencies.append({'pip': dependencies_pip})
         for name, pkg in pip_deps.items():
             h = how_dict.get(name, 'false')
-            use_version = str(h).lower()!='false'
+            use_version = str(h).lower() not in ('false', 'none')
             req_str = req_yaml_template(True, use_version)
             version = format_version(pkg.get('version'), h)
             dependencies_pip.append(req_str.format(name=name, version=version))
