@@ -18,7 +18,7 @@ def format_version(version, how):
     :returns: [str] formatted version string
     """
     _how = str(how).lower()
-    allowed = ('full', 'major', 'minor', 'true', 'false', 'none')
+    allowed = ('full', 'major', 'minor', 'none')
     if _how not in allowed:
         raise ValueError(
             "Argument `how` only accepts the following values: {}".format(
@@ -27,7 +27,7 @@ def format_version(version, how):
         )
 
     n = version.count('.')
-    if (n == 0) or (_how == 'full') or (_how == 'true'):
+    if (n == 0) or (_how == 'full'):
         return version
     if n == 1:
         major, minor = version.split('.')
@@ -318,7 +318,7 @@ class CondaEnvironment:
                             include=None, 
                             exclude=None, 
                             add_exclusion_deps=False,
-                            add_versions='full',
+                            how='full',
                             add_builds=False):
         """
         Builds a minified version of the requirements spec in YAML format.
@@ -341,13 +341,13 @@ class CondaEnvironment:
             ``exclude=['pandas'], add_exclusion_deps=True`` removes 'pandas' 
             from the spec, but adds 'numpy', 'python_dateutil', and 'pytz', 
             the next level of dependencies for pandas.
-        :add_versions: [str|bool]
-            Add part of or the full version to the requirements. 
+        :how: [str|bool]
+            Controls how the version for each package is formatted. 
             Allowed values are: 
-              'full' or 'true' or True- Include the exact version
+              'full' - Include the exact version
               'major' - Include the major value of the version only ('1.*')
               'minor' - Include the major and minor versions ('1.11.*')
-              'none' or 'false' or False - Version not added.
+              'none' - Version not added.
         :add_builds: [bool]
             Add the build number to the requirment, highly specific and will 
             override loosening of version requirements.
@@ -377,7 +377,7 @@ class CondaEnvironment:
         req_data = {k: self._env_packages_info[k] for k in req_names}
 
         env_data = self._construct_env_reqs(req_data)
-        use_version = str(add_versions).lower() not in ('false', 'none')
+        use_version = how.lower() != 'none'
         conda_str = req_yaml_template(False, use_version, add_builds)
         pip_str = req_yaml_template(True, use_version, add_builds)
 
@@ -389,7 +389,7 @@ class CondaEnvironment:
 
         dependencies = yaml_data.get('dependencies')
         for name, pkg in env_data.get('conda_deps').items():
-            version = format_version(pkg.get('version'), add_versions)
+            version = format_version(pkg.get('version'), how)
             dependencies.append(
                 conda_str.format(name=name, version=version, 
                     build_string=pkg.get('build_string'))
@@ -398,7 +398,7 @@ class CondaEnvironment:
         dependencies_pip = []
         dependencies.append({'pip': dependencies_pip})
         for name, pkg in env_data.get('pip_deps').items():
-            version = format_version(pkg.get('version'), add_versions)
+            version = format_version(pkg.get('version'), how)
             dependencies_pip.append(
                 pip_str.format(name=name, version=version)
             )
@@ -422,10 +422,10 @@ class CondaEnvironment:
         :how: [str|bool]
             The default method for how the requirements will be relaxed.  Using
             the `pin` or `override` arguments takes precedence over this value.
-              'full' or 'true' or True- Include the exact version
+              'full' - Include the exact version
               'major' - Include the major value of the version only ('1.*')
               'minor' - Include the major and minor versions ('1.11.*')
-              'none' or 'false' or False - Version not added.
+              'none' - Version not added.
         :pin: [list]
             Which packages will have their full version pinned to the current
             version in the environment.  Packages not in the environment are
@@ -474,7 +474,7 @@ class CondaEnvironment:
         dependencies = yaml_data.get('dependencies')
         for name, pkg in conda_deps.items():
             h = how_dict.get(name, 'false')
-            use_version = str(h).lower() not in ('false', 'none')
+            use_version = how.lower() != 'none'
             req_str = req_yaml_template(False, use_version)
             version = format_version(pkg.get('version'), h)
             dependencies.append(req_str.format(name=name, version=version))
@@ -483,7 +483,7 @@ class CondaEnvironment:
         dependencies.append({'pip': dependencies_pip})
         for name, pkg in pip_deps.items():
             h = how_dict.get(name, 'false')
-            use_version = str(h).lower() not in ('false', 'none')
+            use_version = how.lower() != 'none'
             req_str = req_yaml_template(True, use_version)
             version = format_version(pkg.get('version'), h)
             dependencies_pip.append(req_str.format(name=name, version=version))

@@ -1,5 +1,31 @@
 from .condadeps import CondaEnvironment
 
+_epilog = """Example MINIFY usage
+====================
+Export minified spec for myenv to the file path/to/env.yaml:
+$> conda-reduce myenv -f path/to/env.yaml minify
+
+Minify myenv, excluding pandas and matplotlib
+$> conda-reduce myenv minify -e pandas -e matplotlib
+
+Minify myenv and loosen version requirements to the major release
+$> conda-reduce myenv minify --how major
+
+Minify myenv, include Python, but relax requirements to the minor release
+$> conda-reduce myenv minify -i python --how minor
+
+Example RELAX usage
+===================
+Show all of myenv, but relax the requirments to the major release
+$> conda-reduce myenv relax --how major
+
+Relax myenv to the minor release, but pin the full version of pandas and numpy
+$> conda-reduce myenv relax --how minor -p pandas -p numpy
+
+Relax myenv to package name only, but override the versions of pandas and 
+numpy to the minor release.
+$> conda-reduce myenv relax --how none -o pandas minor -o numpy minor
+"""
 
 def main():
     import sys
@@ -12,8 +38,9 @@ def main():
             return [w for t in text.splitlines() 
                       for w in _textwrap.wrap(t, width)]
 
-    parser = argparse.ArgumentParser(prog='CondaDeps',
+    parser = argparse.ArgumentParser(prog='conda-reduce',
         description='Builds minimized Conda specs to share environments.',
+        epilog=_epilog,
         formatter_class=MyHelpFormatter)
     parser.add_argument('name',
         help='The environment name to export. Use of a forward or backslash '
@@ -35,19 +62,25 @@ def main():
 
     #######################
     # method: minify option
-    minify_parser.add_argument('-i', '--include', action='append',
-        help='Additional ackages to include in the spec.  Can be passed '
-            'multiple times:\n  `... -i pkg1 -i pkg2`')
-    minify_parser.add_argument('-e', '--exclude', action='append', 
-        help='Packages to exclude from the spec.  Can be passed multiple '
-            'times:\n  `... -e pkg1 -e pkg2`')
-    minify_parser.add_argument('--add_versions', default='full', 
-        choices=['full', 'major', 'minor', 'none', 'true', 'false'],
+    minify_parser.add_argument('--how', default='full', 
+        choices=['full', 'major', 'minor', 'none'],
         help='Controls how the version strings are added: \n'
             "- 'full' or 'true': Include the exact version.\n"
             "- 'major': Include major value only ('1.*').\n"  
             "- 'minor': Include major and minor ('1.11.*').\n" 
             "- 'none' or 'false': Version not added.\n")
+    minify_parser.add_argument('-i', '--include', action='append',
+        help='Additional ackages to include in the spec.  Can be passed '
+            'multiple times:\n  ... -i pkg1 -i pkg2')
+    minify_parser.add_argument('-e', '--exclude', action='append', 
+        help='Packages to exclude from the spec.  Can be passed multiple '
+            'times:\n  ... -e pkg1 -e pkg2')
+    minify_parser.add_argument('--add_exclusion_deps', action='store_true',
+        help='Whether to add dependencies of excluded packages to the '
+            'minified spec.  E.g. using:n'
+            '  ... --exclude pandas --add_exclusion_deps\n' 
+            'removes pandas from the spec, but adds numpy, python_dateutil, '
+            'and pytz - the next level of dependencies for pandas.')
     minify_parser.add_argument('--add_builds', action='store_true', 
         help='Add the build number to the requirment. This is highly '
             'specific and will override loosening of version requirements.')
@@ -55,24 +88,24 @@ def main():
     #######################
     # method: relax options
     relax_parser.add_argument('--how', default='minor',
-        choices=['full', 'major', 'minor', 'none', 'true', 'false'],
+        choices=['full', 'major', 'minor', 'none'],
         help="The default method for how requirements are relaxed.  Using "
             "the `pin` or `override` arguments takes precedence over this "
             "value.\n"
-            "- 'full' or 'true': Include the exact version\n"
+            "- 'full': Include the exact version\n"
             "- 'major': Include the major value only ('1.*')\n"
             "- 'minor': Include the major and minor ('1.11.*')\n"
-            "- 'none' or 'false': Version not added.)\n")
+            "- 'none': Version not added.)\n")
     relax_parser.add_argument('-p', '--pin', action='append',
         help='Sets which packages will have their full version pinned to the '
             'version in the environment.  Packages not in the environment are '
             'ignored.  Can be passed multiple times:\n'
-            '... -p numpy -p pandas\n')
+            '  ... -p numpy -p pandas\n')
     relax_parser.add_argument('-o', '--override', action='append', nargs=2,
         help='Allows overriding the default `how` setting for any package. '
             'Takes 2 arguments, the package name the new `how` method. Can be '
             'passed multiple times:\n'
-            '... --how major -o pandas full -o numpy major')
+            '  ... --how major -o pandas full -o numpy major')
 
     if len(sys.argv) <= 1:
         parser.print_help(sys.stderr)
@@ -93,7 +126,8 @@ def main():
             export_path=args.file,
             include=args.include,
             exclude=args.exclude,
-            add_versions=args.add_versions,
+            add_exclusion_deps=args.add_exclusion_deps,
+            how=args.how,
             add_builds=args.add_builds
         )
     if args.method == 'relax':
