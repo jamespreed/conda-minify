@@ -1,0 +1,34 @@
+{% set name = "conda-recude" %}
+{% set version = "0.0.2" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  url: "none yet"
+  #sha256: 
+
+build:
+  number: 0
+  noarch: "python"
+  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
+
+requirements:
+  host:
+    - pip
+    - python >=3.4
+  run:
+    - python >=3.4
+
+test:
+  imports:
+    - conda_reduce
+
+about:
+  home: https://github.com/jamespreed/conda-reduce
+  license_file: LICENSE
+  license: MIT
+  license_family: MIT
+  summary: "Tools for minimizing and relaxing Conda environment requirements for cross-platform sharing."
+  dev_url: https://github.com/jamespreed/conda-reduce
