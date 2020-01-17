@@ -42,7 +42,7 @@ def main():
         help='Packages to exclude from the spec.  Can be passed multiple '
             'times:\n  `... -e pkg1 -e pkg2`')
     minify_parser.add_argument('--how', default='full', 
-        choices=['full', 'major', 'minor', 'none', 'true', 'false'],
+        choices=['full', 'major', 'minor', 'none'],
         help='Controls how the version strings are added: \n'
             "- 'full' or 'true': Include the exact version.\n"
             "- 'major': Include major value only ('1.*').\n"  
@@ -55,14 +55,14 @@ def main():
     #######################
     # method: relax options
     relax_parser.add_argument('--how', default='minor',
-        choices=['full', 'major', 'minor', 'none', 'true', 'false'],
+        choices=['full', 'major', 'minor', 'none'],
         help="The default method for how requirements are relaxed.  Using "
             "the `pin` or `override` arguments takes precedence over this "
             "value.\n"
-            "- 'full' or 'true': Include the exact version\n"
+            "- 'full': Include the exact version\n"
             "- 'major': Include the major value only ('1.*')\n"
             "- 'minor': Include the major and minor ('1.11.*')\n"
-            "- 'none' or 'false': Version not added.)\n")
+            "- 'none': Version not added.)\n")
     relax_parser.add_argument('-p', '--pin', action='append',
         help='Sets which packages will have their full version pinned to the '
             'version in the environment.  Packages not in the environment are '
