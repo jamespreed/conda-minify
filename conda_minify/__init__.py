@@ -1,1 +1,1 @@
-from .condadeps import CondaEnvironment
+from .environment import CondaEnvironment

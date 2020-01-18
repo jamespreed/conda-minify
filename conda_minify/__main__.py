@@ -1,4 +1,4 @@
-from .condadeps import CondaEnvironment
+from .environment import CondaEnvironment
 
 _epilog = """Example MINIFY usage
 ====================
