@@ -1,5 +1,7 @@
 *.pyc
 .vscode/
 archive/
+build/
+dist/
 __pycache__/
-conda_minify.egg-info/
+*.egg-info/
