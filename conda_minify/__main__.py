@@ -1,30 +1,17 @@
 from .environment import CondaEnvironment
 
-_epilog = """Example MINIFY usage
-====================
+_epilog = """===>>> Example MINIFY usage <<<===
 Export minified spec for myenv to the file path/to/env.yaml:
-  conda-minify myenv -f path/to/env.yaml minify
+          [ conda-minify myenv minify ] -f path/to/env.yaml
+Exclude pandas & matplotlib:      [...] -e pandas -e matplotlib
+Loosen version to major release:  [...] --how major
+Include Python, version to minor: [...] -i python --how minor
 
-Minify myenv, excluding pandas and matplotlib
-  conda-minify myenv minify -e pandas -e matplotlib
-
-Minify myenv and loosen version requirements to the major release
-  conda-minify myenv minify --how major
-
-Minify myenv, include Python, but relax requirements to the minor release
-  conda-minify myenv minify -i python --how minor
-
-Example RELAX usage
-===================
+===>>> Example RELAX usage <<<===
 Show all of myenv, but relax the requirments to the major release
-  conda-minify myenv relax --how major
-
-Relax myenv to the minor release, but pin the full version of pandas and numpy
-  conda-minify myenv relax --how minor -p pandas -p numpy
-
-Relax myenv to package name only, but override the versions of pandas and 
-numpy to the minor release.
-  conda-minify myenv relax --how none -o pandas minor -o numpy minor
+           [ conda-minify myenv relax ] --how major
+Relax to minor, pin two version:  [...] --how minor -p pandas -p numpy
+Relax and override versions:      [...] -o pandas minor -o numpy minor
 """
 
 def main():
