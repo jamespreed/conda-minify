@@ -24,12 +24,12 @@ requirements:
 
 test:
   imports:
-    - conda_reduce
+    - conda_minify
 
 about:
-  home: https://github.com/jamespreed/conda-reduce
+  home: https://github.com/jamespreed/conda-minify
   license_file: LICENSE
   license: MIT
   license_family: MIT
   summary: "Tools for minimizing and relaxing Conda environment requirements for cross-platform sharing."
-  dev_url: https://github.com/jamespreed/conda-reduce
+  dev_url: https://github.com/jamespreed/conda-minify

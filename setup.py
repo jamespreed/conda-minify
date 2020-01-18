@@ -10,15 +10,15 @@ with here.joinpath('VERSION').open() as fp:
     VERSION = fp.read().strip()
 
 setup(
-    name='conda-reduce',
+    name='conda-minify',
     version=VERSION,  
     description='A simple library to create minified or relaxed versions '
                 'of Conda environment specs for cross-platform sharing.', 
     long_description=long_description, 
     long_description_content_type='text/markdown',  
-    url='https://github.com/jamespreed/conda-reduce',
+    url='https://github.com/jamespreed/conda-minify',
     author='James Reed',
-    author_email='https://github.com/jamespreed/conda-reduce/issues', 
+    author_email='https://github.com/jamespreed/conda-minify/issues', 
     classifiers=[  
         'Intended Audience :: Developers',
         'Intended Audience :: Science/Research',
@@ -32,12 +32,12 @@ setup(
         'Programming Language :: Python :: 3.8',
     ],
     keywords='conda virtual environment yaml',
-    packages=['conda_reduce'],
+    packages=['conda_minify'],
     python_requires='>=3.4, <4',
     install_requires=['conda>=4.3.0', 'pyyaml>3.0'],
     entry_points={  # Optional
         'console_scripts': [
-            'conda-reduce = conda_reduce.__main__:main',
+            'conda-minify = conda_minify.__main__:main',
         ],
     },
 )
