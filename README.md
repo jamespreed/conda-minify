@@ -12,7 +12,7 @@ It was not an uncommon occurance for me to run into issues when trying to use an
 Conda Minify provides a simple way to produce an Conda specification YAML file with only the minimum requirements needed to *approximately* reproduce the environment.  Conda can figure out the rest of the details for the dependencies.  For example, if you have an environment with Pandas and Matplotib; sharing the environment really only requires specifying Pandas and Matplotib and their versions.
 
 ## Installation
-These are the recommended methods for installation.  It is worth noting that Conda Minify can be run *without* installation as a script module using the same CLI commands; please see the [Usage section](####cli-via-python) .
+These are the recommended methods for installation.  It is worth noting that Conda Minify can be run *without* installation as a script module using the same CLI commands; please see the [Usage section](#cli-via-python) .
 ### Via Conda
     conda install conda-minify -c jamespreed
 ### Via PIP
