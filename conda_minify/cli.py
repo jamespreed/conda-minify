@@ -1,3 +1,7 @@
+import sys
+import argparse
+import textwrap as _textwrap
+from argparse import RawTextHelpFormatter, ArgumentDefaultsHelpFormatter
 from .environment import CondaEnvironment
 
 _epilog = """===>>> Example MINIFY usage <<<===
@@ -14,17 +18,12 @@ Relax to minor, pin two version:  [...] --how minor -p pandas -p numpy
 Relax and override versions:      [...] -o pandas minor -o numpy minor
 """
 
+class MyHelpFormatter(RawTextHelpFormatter, ArgumentDefaultsHelpFormatter):
+    def _split_lines(self, text, width):
+        return [w for t in text.splitlines() 
+                    for w in _textwrap.wrap(t, width)]
+
 def main():
-    import sys
-    import argparse
-    import textwrap as _textwrap
-    from argparse import RawTextHelpFormatter, ArgumentDefaultsHelpFormatter
-
-    class MyHelpFormatter(RawTextHelpFormatter, ArgumentDefaultsHelpFormatter):
-        def _split_lines(self, text, width):
-            return [w for t in text.splitlines() 
-                      for w in _textwrap.wrap(t, width)]
-
     parser = argparse.ArgumentParser(prog='conda-minify',
         description='Builds minimized Conda specs to share environments.',
         epilog=_epilog,
@@ -101,7 +100,7 @@ def main():
         parser.print_help(sys.stderr)
         sys.exit(1)
 
-    args = parser.parse_args()
+    args = parser.parse_args(sys.argv[1:3])
     # check for path characters in name
     if ('/' in args.name) or ('\\' in args.name):
         args.path = args.name
@@ -132,6 +131,3 @@ def main():
             '"{}"'.format(args.file))
     else:
         print(yaml_str)
-
-if __name__ == '__main__':
-    main()
