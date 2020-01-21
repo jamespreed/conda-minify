@@ -18,7 +18,6 @@ setup(
     long_description_content_type='text/markdown',  
     url='https://github.com/jamespreed/conda-minify',
     author='James Reed',
-    author_email='https://github.com/jamespreed/conda-minify/issues', 
     classifiers=[  
         'Intended Audience :: Developers',
         'Intended Audience :: Science/Research',

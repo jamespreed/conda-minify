@@ -1,22 +1,24 @@
 {% set data = load_setup_py_data() %}
 
 package:
-  name: "{{ data.name|lower }}"
-  version: "{{ data.version }}"
+  name: "conda-minify"
+  version: {{ data.get('version') }}
 
 source:
-  url: "none yet"
-  #sha256: 
+  path: ../
 
 build:
   number: 0
   noarch: "python"
-  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
+  entry_points:
+    - conda-minify = conda_minify.__main__:main
 
 requirements:
-  host:
-    - pip
+  build:
     - python >=3.4
+    - setuptools
+    - pyyaml >3.0
+    - conda >=4.3.0
   run:
     - python >=3.4
     - conda >=4.3.0
