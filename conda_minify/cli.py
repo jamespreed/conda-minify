@@ -21,7 +21,7 @@ Relax and override versions:      [...] -o pandas minor -o numpy minor
 class MyHelpFormatter(RawTextHelpFormatter, ArgumentDefaultsHelpFormatter):
     def _split_lines(self, text, width):
         return [w for t in text.splitlines() 
-                    for w in _textwrap.wrap(t, width)]
+                for w in _textwrap.wrap(t, width)]
 
 def main():
     parser = argparse.ArgumentParser(prog='conda-minify',
