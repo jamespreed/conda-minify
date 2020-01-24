@@ -4,6 +4,7 @@ import os
 import textwrap as _textwrap
 from argparse import HelpFormatter
 from .environment import CondaEnvironment
+from .__version__ import __version__
 
 
 class MyFormatter(HelpFormatter):
@@ -12,7 +13,8 @@ class MyFormatter(HelpFormatter):
                     for w in _textwrap.wrap(t, width)]
 
 def main():
-    parser = argparse.ArgumentParser(prog='conda-minify',
+    parser = argparse.ArgumentParser(
+        prog='conda-minify (v {})'.format(__version__),
         description='Builds minimized Conda specs to share environments.',
         formatter_class=MyFormatter)
     main_group = parser.add_argument_group(
