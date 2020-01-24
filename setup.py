@@ -34,6 +34,7 @@ setup(
     packages=['conda_minify'],
     python_requires='>=3.4, <4',
     install_requires=['conda>=4.3.0', 'pyyaml>3.0'],
+    data_files=[('', ['VERSION'])],
     entry_points={  # Optional
         'console_scripts': [
             'conda-minify = conda_minify.__main__:main',
