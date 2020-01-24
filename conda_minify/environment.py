@@ -487,7 +487,7 @@ class CondaEnvironment:
             req_str = req_yaml_template(True, use_version)
             version = format_version(pkg.get('version'), h)
             dependencies_pip.append(req_str.format(name=name, version=version))
-        if dependencies_pip
+        if dependencies_pip:
             dependencies.append({'pip': dependencies_pip})
             
         yaml_str = yaml.dump(yaml_data, sort_keys=False)
