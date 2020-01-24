@@ -396,12 +396,13 @@ class CondaEnvironment:
             )
         
         dependencies_pip = []
-        dependencies.append({'pip': dependencies_pip})
         for name, pkg in env_data.get('pip_deps').items():
             version = format_version(pkg.get('version'), how)
             dependencies_pip.append(
                 pip_str.format(name=name, version=version)
             )
+        if dependencies_pip:
+            dependencies.append({'pip': dependencies_pip})
 
         yaml_str = yaml.dump(yaml_data, sort_keys=False)
         self._exporter(export_path, yaml_str)
@@ -480,13 +481,14 @@ class CondaEnvironment:
             dependencies.append(req_str.format(name=name, version=version))
 
         dependencies_pip = []
-        dependencies.append({'pip': dependencies_pip})
         for name, pkg in pip_deps.items():
             h = how_dict.get(name, 'false')
             use_version = how.lower() != 'none'
             req_str = req_yaml_template(True, use_version)
             version = format_version(pkg.get('version'), h)
             dependencies_pip.append(req_str.format(name=name, version=version))
+        if dependencies_pip
+            dependencies.append({'pip': dependencies_pip})
             
         yaml_str = yaml.dump(yaml_data, sort_keys=False)
         self._exporter(export_path, yaml_str)
