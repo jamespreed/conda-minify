@@ -25,10 +25,11 @@ Conda Minify has two primary method for reducing environment requirements: `mini
 ### Command Line Interface
 After installation the CLI can be invoked using:
 
-    conda-minify <name> <minify | relax> [-f filename] [options ...]
+    conda-minify [--name env_name] [--relax] [--how method] [-f filename] [options ...]
 
-- `name` - environment name to export
-- `<minify | relax>` - which tool to use
+- `--name env_name` - name of the environment export, if not passed, the current environment is used.
+- `--relax` - switches to using the `relax` methods described above.
+- `--how method` - which method to use for creating version strings.
 - `-f filename` - (optional) write the minified spec to `filename` otherwise prints to screen.
 - Run the tool to see a full list of options for `minify` and `relax`
 

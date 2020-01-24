@@ -65,13 +65,12 @@ def main():
         description='Options exclusively available when using RELAX (via '
             '--relax).  These are ignored unless --relax is passed.')
     relax_group.add_argument('-p', '--pin', action='append',
-        help='Sets which packages will have their full version pinned to the '
-            'version in the environment.  Packages not in the environment are '
-            'ignored.  Can be passed multiple times:\n'
+        help='Pins package version to full version. Packages not in the '
+            'environment are ignored.  Can be passed multiple times:\n'
             '  ... -p numpy -p pandas\n')
     relax_group.add_argument('-o', '--override', action='append', nargs=2,
-        help='Allows overriding the default `how` setting for any package. '
-            'Takes 2 arguments, the package name the new `how` method. Can be '
+        help='Overrides the default `how` setting for any package. '
+            'Takes 2 arguments, package name and new `how` method. Can be '
             'passed multiple times:\n'
             '  ... --how major -o pandas full -o numpy major')
 
