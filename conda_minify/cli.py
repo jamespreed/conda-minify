@@ -90,7 +90,7 @@ def main():
     cenv = CondaEnvironment(args.name, args.path)
     cenv.build_graph()
 
-    if args.relax == 'relax':
+    if args.relax:
         yaml_str = cenv.relax_requirements(
             export_path=args.file,
             how=args.how,
