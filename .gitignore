@@ -3,5 +3,6 @@
 archive/
 build/
 dist/
+dist-conda/
 __pycache__/
 *.egg-info/

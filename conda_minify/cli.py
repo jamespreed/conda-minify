@@ -4,6 +4,7 @@ import os
 import textwrap as _textwrap
 from argparse import HelpFormatter
 from .environment import CondaEnvironment
+from .__version__ import __version__
 
 
 class MyFormatter(HelpFormatter):
@@ -12,7 +13,8 @@ class MyFormatter(HelpFormatter):
                     for w in _textwrap.wrap(t, width)]
 
 def main():
-    parser = argparse.ArgumentParser(prog='conda-minify',
+    parser = argparse.ArgumentParser(
+        prog='conda-minify (v {})'.format(__version__),
         description='Builds minimized Conda specs to share environments.',
         formatter_class=MyFormatter)
     main_group = parser.add_argument_group(
@@ -26,16 +28,17 @@ def main():
         action='store_true', 
         help='Switches to using the relax API to export the entire '
             'environment specs with relaxed versioning numbers.')
-    main_group.add_argument('--how', default='minor',
+    main_group.add_argument('--how',
         choices=['full', 'major', 'minor', 'none'],
-        help='(default: minor)\nThe method for how requirement versions are '
+        help='(default: full)\nThe method for how requirement versions are '
             'added to the spec.\n'
             "- 'full': Include the exact version\n"
             "- 'major': Include the major value only ('1.*')\n"
             "- 'minor': Include the major and minor ('1.11.*')\n"
             "- 'none': Version is omitted\n"
-            'Note: When using the --relax option:\n  The --pin and '
-            '--override arguments takes precedence over this value.\n')
+            'NOTE:\nWhen using the --relax option:\n  1. The --pin and '
+            '--override arguments takes precedence over this value.\n'
+            "  2. The default for --relax is 'minor'")
     main_group.add_argument('-f', '--file', default=None,
         help='The file path for export.  Default prints output to screen.')
 
@@ -87,10 +90,14 @@ def main():
     else:
         args.path = None
 
+    # set how defaults
+    if not args.how:
+        args.how = 'minor' if args.relax else 'full'
+
     cenv = CondaEnvironment(args.name, args.path)
     cenv.build_graph()
 
-    if args.relax == 'relax':
+    if args.relax:
         yaml_str = cenv.relax_requirements(
             export_path=args.file,
             how=args.how,

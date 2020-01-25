@@ -1,0 +1,29 @@
+# ENV
+# - python=3.7.6
+# - pip=19.3.1
+# - conda=4.8.1
+# - conda-build=3.18.11
+# - setuptools=44.0.0
+# - wheel=0.33.6
+# - twine=2.0.0
+
+# PACKAGING
+# packaging built using the following commands
+# - pypi (run in same path as setup.py)
+python setup.py sdist bdist_wheel
+# - conda (run in path above setup.py)
+conda build conda-minify --output-folder conda-minify/dist-conda
+
+# UPLOADS
+# - pypi
+#   - test
+twine upload --repository testpypi dist/*
+# test cmd:
+pip install conda-minify -i https://test.pypi.org/simple
+conda-minify --how major -e pip
+conda-minify --relax
+#   - main (after test)
+twine upload --repository pypi dist/*
+# - anaconda
+anaconda login
+anaconda upload dist-conda/noarch/conda-minify*

@@ -1,17 +1,18 @@
 from setuptools import setup
 from pathlib import Path
+from conda_minify import __version__
 
 here = Path(__file__).parent.absolute()
 
 with here.joinpath('README.md').open() as fp:
     long_description = fp.read().strip()
 
-with here.joinpath('VERSION').open() as fp:
-    VERSION = fp.read().strip()
+# with here.joinpath('VERSION').open() as fp:
+#     VERSION = fp.read().strip()
 
 setup(
     name='conda-minify',
-    version=VERSION,  
+    version=__version__,  
     description='A simple library to create minified or relaxed versions '
                 'of Conda environment specs for cross-platform sharing.', 
     long_description=long_description, 
@@ -34,6 +35,7 @@ setup(
     packages=['conda_minify'],
     python_requires='>=3.4, <4',
     install_requires=['conda>=4.3.0', 'pyyaml>3.0'],
+    #data_files=[('', ['VERSION'])],
     entry_points={  # Optional
         'console_scripts': [
             'conda-minify = conda_minify.__main__:main',
