@@ -34,6 +34,9 @@ setup(
     keywords='conda virtual environment yaml',
     packages=['conda_minify'],
     python_requires='>=3.4, <4',
+    extras_require={"test":
+                    ['pytest']
+                    },
     install_requires=['conda>=4.3.0', 'pyyaml>3.0'],
     #data_files=[('', ['VERSION'])],
     entry_points={  # Optional
