@@ -1,5 +1,6 @@
 import pathlib
-import sys
+import os
+import glob
 import json
 import yaml
 from collections import defaultdict
@@ -130,8 +131,10 @@ class CondaEnvironment:
             self._init_from_path(path)
         elif name:
             self._init_from_name(name)
+
+        self.pypi_root_path = self.get_pypi_root_path()
         self.load_package_metadata()
-            
+
     def _init_from_name(self, name):
         try:
             header, _, _ = run_command('list', '-n', name, '_NOPACKAGE_')
@@ -214,6 +217,34 @@ class CondaEnvironment:
             return out
         return out
 
+    def get_pypi_root_path(self):
+        """
+        Returns the path to directory where PyPi metadata files resides, or None.
+
+        :returns: [pathlib.Path|None]
+        """
+        python_pkg = None
+        for pkg in self.get_conda_env_json():
+            name = pkg.get('name')
+            if name.lower() == "python":
+                python_pkg = pkg
+                break
+
+        # no Python, no Pip...
+        if python_pkg is None: return None
+
+        python_versions = pkg['version'].split(".")
+        while len(python_versions) > 0:
+            pattern = str(self._path) + os.sep + "[Ll]ib"  # Big-L in Windows. little-l elsewhere
+            pattern += os.sep + "python"+".".join(python_versions)
+            python_versions.pop()
+            pattern += os.sep + "site-packages"
+
+            paths  = glob.glob(pattern)
+            if len(paths)==1:
+                return pathlib.Path(paths[0])
+        return None
+
     def get_pypi_pkg_path(self, pkg):
         """
         This modifies the `pkg` in-place if the name has a dash.
@@ -227,16 +258,14 @@ class CondaEnvironment:
         pkg_version = pkg.get('version')
         # can't have a dash in the package directory, normally an underscore,
         # but occassionally some moron uses a dot
-        for c in '_.':
-            name = pkg_name.replace('-', c)
-            path = self._path.joinpath(
-                'Lib', 
-                'site-packages', 
-                '{0}-{1}.dist-info'.format(name, pkg_version),
-                'METADATA'
-            )
-            if path.exists():
-                return path
+        name = pkg_name.replace('-','[_.]')
+    
+        pattern = str(self.pypi_root_path) + os.sep
+        pattern += f"{name}-{pkg_version}.dist-info" + os.sep
+        pattern += "METADATA"
+        paths  = glob.glob(pattern)
+        if len(paths)==1:
+            return pathlib.Path(paths[0])
         return None
 
     def read_pypi_metadata(self, pkg):
