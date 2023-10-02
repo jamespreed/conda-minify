@@ -311,6 +311,7 @@ class CondaEnvironment:
         """
         g = self.conda_graph = CondaGraph()
         for pkg in self.env_packages_info.values():
+            g.add_node(pkg.get('simple_name')) # Include package even with no deps
             g.add_connections(pkg.get('simple_name'), pkg.get('depends'))
 
     def minify_requirements(self, 
